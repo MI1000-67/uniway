@@ -6,7 +6,7 @@ import { MapView } from './components/MapView';
 import { SessionClock } from './components/SessionClock';
 import { RouteOptions } from './components/RouteOptions';
 import { importImages } from './import/importMap';
-import { demo, junctions, type Campus, type Place } from './data';
+import { demo, junctions, type Campus, type Place, type Point } from './data';
 import {
   findAlternatives,
   routePoints,
@@ -19,6 +19,7 @@ import {
 import { readSession, writeSession, clearSession } from './storage';
 import { ThemeSwitch, Dialog } from './components/ui';
 import { Scanner } from './components/Scanner';
+import { movePlace } from './editMap.mjs';
 import { matchesPlace } from './search.mjs';
 import './style.css';
 
@@ -43,7 +44,9 @@ function App() {
     [dark, setDark] = useState(document.documentElement.dataset.theme === 'dark');
   const [floor, setFloor] = useState(0),
     [mobileList, setMobileList] = useState(false),
-    [edit, setEdit] = useState<'none' | 'pin' | 'connect'>('none'),
+    [edit, setEdit] = useState<'none' | 'pin' | 'connect' | 'move'>('none'),
+    [draftPoints, setDraftPoints] = useState<Point[]>([]),
+    [pendingLabel, setPendingLabel] = useState<number | null>(null),
     [connectFrom, setConnectFrom] = useState<string | null>(null),
     [newPoint, setNewPoint] = useState({ x: 0, y: 0 }),
     [newName, setNewName] = useState(''),
@@ -99,6 +102,8 @@ function App() {
   const changeCampus = (c: Campus | null) => {
     setSession((s) => ({ ...s, campus: c, saved: [] }));
     setFloor(0);
+    setPendingLabel(null);
+    setConnectFrom(null);
     setSelected(c?.places[0]?.id || 'library');
     setStart(c?.places[0]?.id || 'gate');
     setDirections(false);
@@ -219,11 +224,14 @@ function App() {
       localStorage.setItem('uniway-theme', next ? 'dark' : 'light');
     } catch {}
   };
+  useEffect(() => {
+    setDraftPoints([]);
+  }, [connectFrom, edit, floor]);
   const pick = (p: Place) => {
     if (edit === 'connect') {
       if (!connectFrom) {
         setConnectFrom(p.id);
-        notify('Now select the other end of this walkway.');
+        notify('Click along the walkway to add bends, then select the end pin.');
       } else if (connectFrom === p.id) {
         setConnectFrom(null);
       } else {
@@ -253,6 +261,7 @@ function App() {
                 accessible: pathAccessible,
                 confirmed: true,
                 source: 'manual',
+                points: [{ x: a!.x, y: a!.y }, ...draftPoints, { x: p.x, y: p.y }],
               },
             ],
           },
@@ -282,6 +291,8 @@ function App() {
     setSelected('library');
     setStart('gate');
     setFloor(0);
+    setPendingLabel(null);
+    setConnectFrom(null);
     setDirections(false);
     setWalking(false);
     setQuery('');
@@ -324,7 +335,9 @@ function App() {
       if (controller.signal.aborted || isExpired(session.expiresAt)) return;
       changeCampus(c);
       setModal(null);
-      notify(`${c.places.length} places found. Your generated map is ready to review.`);
+      notify(
+        `${c.places.length} pins suggested · ${c.images.reduce((sum, im) => sum + (im.unplacedLabels?.length ?? 0), 0)} labels need placement. Review your layout to continue.`,
+      );
     } catch (error) {
       if (!controller.signal.aborted)
         setUploadError(
@@ -377,7 +390,23 @@ function App() {
               : 'pin',
       description: 'A place you added to this map.',
     };
-    setSession((s) => ({ ...s, campus: { ...campus, places: [...campus.places, p] } }));
+    setSession((s) => ({
+      ...s,
+      campus: {
+        ...campus,
+        places: [...campus.places, p],
+        images: campus.images.map((im, f) =>
+          f === floor
+            ? {
+                ...im,
+                reviewed: false,
+                unplacedLabels: im.unplacedLabels?.filter((_, i) => i !== pendingLabel),
+              }
+            : im,
+        ),
+      },
+    }));
+    setPendingLabel(null);
     setSelected(p.id);
     if (!campus.places.length || !campus.places.some((q) => q.id === start)) setStart(p.id);
     setModal(null);
@@ -795,10 +824,23 @@ function App() {
           startName={campus.places.find((p) => p.id === start)?.name || 'starting point'}
           edit={edit}
           connectFrom={connectFrom}
+          draftPoints={draftPoints}
+          onUndoPoint={() => setDraftPoints((points) => points.slice(0, -1))}
+          onPathPoint={(point) =>
+            setDraftPoints((points) => (points.length < 198 ? [...points, point] : points))
+          }
+          onMove={(point) => {
+            if (!place) return;
+            setSession((old) => ({ ...old, campus: movePlace(campus, place.id, point) }));
+            setEdit('pin');
+            notify('Pin moved. Please review its connected paths again.');
+          }}
           pathAccessible={pathAccessible}
           onPathAccessible={setPathAccessible}
           onFloor={(f) => {
             setFloor(f);
+            setPendingLabel(null);
+            setNewName('');
             const first = campus.places.find((p) => p.floor === f);
             setSelected(first?.id || '');
             setStart(first?.id || '');
@@ -809,11 +851,13 @@ function App() {
           onSelect={pick}
           onAdd={(point) => {
             setNewPoint(point);
-            setNewName('');
+            if (pendingLabel === null) setNewName('');
             setModal('pin');
           }}
           onEdit={(mode) => {
             setEdit(mode);
+            setPendingLabel(null);
+            setNewName('');
             setDirections(false);
             setConnectFrom(null);
           }}
@@ -1077,13 +1121,51 @@ function App() {
                 </g>
               );
             })}
+            {campus.places
+              .filter((p) => p.floor === floor)
+              .map((p, i) => (
+                <g key={p.id} transform={`translate(${p.x} ${p.y})`}>
+                  <circle r="14" fill="#244E43" stroke="white" strokeWidth="3" />
+                  <text fill="white" textAnchor="middle" dy=".35em" fontSize="15">
+                    {i + 1}
+                  </text>
+                </g>
+              ))}
           </svg>
+          {!!campus.images[floor]?.unplacedLabels?.length && (
+            <div className="unplaced-labels">
+              <h3>Labels waiting for a place</h3>
+              <p>
+                These colours or positions are ambiguous. Choose a label, then click its entrance on
+                the map.
+              </p>
+              {campus.images[floor].unplacedLabels!.map((label, index) => (
+                <button
+                  key={index}
+                  onClick={() => {
+                    setPendingLabel(index);
+                    setNewName(label.name);
+                    setNewCategory(categoryFor(label.name).category);
+                    setEdit('pin');
+                    setDirections(false);
+                    setModal(null);
+                    setMobileList(false);
+                    notify(`Place ${label.name} at its entrance.`);
+                  }}
+                >
+                  <span style={{ background: label.color || '#244E43' }} />
+                  {label.name}
+                  <Icon name="plus" size={16} />
+                </button>
+              ))}
+            </div>
+          )}
           <div className="review-place-list">
             {campus.places
               .filter((p) => p.floor === floor)
-              .map((place) => (
+              .map((place, index) => (
                 <label key={place.id}>
-                  <Icon name={place.icon} size={17} />
+                  <span className="review-pin-number">{index + 1}</span>
                   <input
                     aria-label={`Name of detected place ${place.name}`}
                     value={place.name}
@@ -1334,7 +1416,7 @@ function App() {
                 <h3>Bring your own map</h3>
                 <p>
                   Upload a clear layout photo. UniWay reads labels and detects building and path
-                  shapes, then shows a generated map. Compare it with the source and correct
+                  shapes, then overlays suggested pins on your original map. Review and correct
                   mistakes in Edit. Each image is a separate level; cross-level routes are not
                   supported yet.
                 </p>

@@ -26,6 +26,7 @@ export type MapImage = {
   roads?: Point[][];
   reviewed?: boolean;
   warnings?: string[];
+  unplacedLabels?: { name: string; confidence?: number; color?: string }[];
 };
 export type Campus = {
   version: 1;

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0 — 13 October 2026
+
+Small map imports now use a higher-resolution OCR pass and conservative colour-legend matching. The original layout stays visible by default, with numbered pins and a queue for ambiguous labels. Pins can be moved to entrances and walkways can be traced around bends. Moving a pin clears review and step-free claims for attached paths. Sidebar scale marks, thin outlines and white space are excluded from path proposals.
+
+The local English model is now the compact quantized LSTM model supplied by the existing dependency. No API service or image upload was added. Added regression coverage, a layout import report and a 60-hour planning record with no invented historical hours.
+
 ## 0.2.0 — 2026-10-13
 
 - Added on-device English OCR and layout processing, with candidate paths and human review before directions.
