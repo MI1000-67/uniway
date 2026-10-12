@@ -34,3 +34,7 @@ Run these on Android Chrome and iPhone Safari, recording device, OS, browser ver
 | Fresh clone and static HTTPS deployment               | OCR assets load from same host; no API key needed                           |
 
 Real-campus acceptance also requires field checks of entrances, closures, direction permissions and step-free evidence. The earlier survey workbook has separate validation findings and is not bundled or certified by this app release.
+
+## Small layouts with a colour legend
+
+Reimport the image to use the new reading pass. Check that the original drawing stays visible and that suggested numbered pins align with the correct buildings. Repeated colours should leave labels waiting for placement. Place one, cancel another, change floors and reload the session to verify the queue stays correct. Move a pin and confirm its paths require review again. Trace a walkway around two bends, undo one bend, finish at another pin and verify the route follows the traced geometry. Repeat with keyboard entry and touch. This browser/device checklist has not yet been completed for 0.3.0.
