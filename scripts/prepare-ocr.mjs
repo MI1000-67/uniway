@@ -12,7 +12,7 @@ const core = resolve(root, 'node_modules/tesseract.js-core');
 for (const file of await readdir(core))
   if (/\.wasm(?:\.js)?$/.test(file)) await cp(resolve(core, file), resolve(target, 'core', file));
 await cp(
-  resolve(root, 'node_modules/@tesseract.js-data/eng/4.0.0/eng.traineddata.gz'),
+  resolve(root, 'node_modules/@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz'),
   resolve(target, 'lang/eng.traineddata.gz'),
 );
 console.log('Local OCR worker, WebAssembly builds, and English model are ready.');

@@ -17,14 +17,18 @@ type Props = {
   saved: boolean;
   minutes: number;
   startName: string;
-  edit: 'none' | 'pin' | 'connect';
+  edit: 'none' | 'pin' | 'connect' | 'move';
   connectFrom: string | null;
+  draftPoints: Point[];
+  onUndoPoint: () => void;
+  onPathPoint: (point: Point) => void;
+  onMove: (point: Point) => void;
   pathAccessible: boolean;
   onPathAccessible: (value: boolean) => void;
   onFloor: (floor: number) => void;
   onSelect: (place: Place) => void;
   onAdd: (point: Point) => void;
-  onEdit: (mode: 'none' | 'pin' | 'connect') => void;
+  onEdit: (mode: 'none' | 'pin' | 'connect' | 'move') => void;
   onSave: () => void;
   onDirections: () => void;
   onDelete: () => void;
@@ -37,7 +41,7 @@ export function MapView(p: Props) {
   const [zoom, setZoom] = useState(1),
     [pan, setPan] = useState({ x: 0, y: 0 }),
     [bearing, setBearing] = useState(0),
-    [source, setSource] = useState(false);
+    [source, setSource] = useState(true);
   const svg = useRef<SVGSVGElement>(null),
     group = useRef<SVGGElement>(null);
   const pointers = useRef(new Map<number, Point>()),
@@ -57,7 +61,7 @@ export function MapView(p: Props) {
   };
   useEffect(() => {
     reset();
-    setSource(false);
+    setSource(true);
   }, [p.floor, p.campus.name, image?.data]);
   const pointOnMap = (x: number, y: number) =>
     new DOMPoint(x, y).matrixTransform(group.current!.getScreenCTM()!.inverse());
@@ -104,12 +108,17 @@ export function MapView(p: Props) {
       );
     }
   };
+  const placePoint = (q: Point) => {
+    if (p.edit === 'pin') p.onAdd(q);
+    if (p.edit === 'move') p.onMove(q);
+    if (p.edit === 'connect' && p.connectFrom) p.onPathPoint(q);
+  };
   const up = (event: React.PointerEvent<SVGSVGElement>) => {
     const initial = gesture.current;
     pointers.current.delete(event.pointerId);
-    if (!initial?.moved && initial?.points.length === 1 && p.edit === 'pin') {
+    if (!initial?.moved && initial?.points.length === 1 && p.edit !== 'none') {
       const q = pointOnMap(event.clientX, event.clientY);
-      if (q.x >= 0 && q.x <= 1000 && q.y >= 0 && q.y <= 800) p.onAdd({ x: q.x, y: q.y });
+      if (q.x >= 0 && q.x <= 1000 && q.y >= 0 && q.y <= 800) placePoint({ x: q.x, y: q.y });
     }
     if (pointers.current.size) rebase();
     else gesture.current = null;
@@ -141,15 +150,15 @@ export function MapView(p: Props) {
     if (event.key === '[' || event.key === ']')
       setBearing((b) => b + (event.key === '[' ? -45 : 45));
     if (event.key === 'Home') reset();
-    if (event.key === 'Enter' && p.edit === 'pin') {
+    if (event.key === 'Enter' && p.edit !== 'none') {
       const r = svg.current!.getBoundingClientRect(),
         q = pointOnMap(r.x + r.width / 2, r.y + r.height / 2);
-      if (q.x >= 0 && q.x <= 1000 && q.y >= 0 && q.y <= 800) p.onAdd(q);
+      if (q.x >= 0 && q.x <= 1000 && q.y >= 0 && q.y <= 800) placePoint(q);
     }
   };
   return (
     <section
-      className={`map-panel ${p.edit !== 'none' ? 'editing' : ''}`}
+      className={`map-panel ${p.custom ? 'custom-map' : ''} ${p.edit !== 'none' ? 'editing' : ''}`}
       aria-label="Interactive campus map"
     >
       <div className="map-topbar">
@@ -161,7 +170,7 @@ export function MapView(p: Props) {
             <strong>{p.campus.name}</strong>
             <small>
               {p.custom
-                ? `${p.campus.places.filter((q) => q.floor === p.floor).length} places · Generated from your layout`
+                ? `${p.campus.places.filter((q) => q.floor === p.floor).length} places · On your original layout`
                 : 'A campus full of possibilities'}
               <span className="map-demo">{p.custom ? 'LOCAL MAP' : 'FICTIONAL DEMO'}</span>
             </small>
@@ -217,6 +226,7 @@ export function MapView(p: Props) {
                       <rect
                         key={i}
                         className="generated-building"
+                        style={b.color ? { fill: b.color } : undefined}
                         x={b.x}
                         y={b.y}
                         width={b.width}
@@ -257,7 +267,7 @@ export function MapView(p: Props) {
               ))}
             {p.campus.places
               .filter((q) => q.floor === p.floor)
-              .map((q) => (
+              .map((q, index) => (
                 <g
                   key={q.id}
                   data-pin
@@ -280,9 +290,16 @@ export function MapView(p: Props) {
                 >
                   <circle className="pin-hit" r="26" />
                   <circle r={place?.id === q.id ? 22 : 16} />
-                  <g transform="translate(-9 -9)">
-                    <Icon name={q.icon} size={18} />
-                  </g>
+                  <title>{q.name}</title>
+                  {p.custom ? (
+                    <text className="pin-number" textAnchor="middle" dy=".35em">
+                      {index + 1}
+                    </text>
+                  ) : (
+                    <g transform="translate(-9 -9)">
+                      <Icon name={q.icon} size={18} />
+                    </g>
+                  )}
                   <text className="pin-label" textAnchor="middle" y={place?.id === q.id ? 43 : 37}>
                     {q.name}
                   </text>
@@ -293,6 +310,21 @@ export function MapView(p: Props) {
                   )}
                 </g>
               ))}
+            {p.edit === 'connect' &&
+              p.connectFrom &&
+              (() => {
+                const first = p.campus.places.find((q) => q.id === p.connectFrom);
+                return first ? (
+                  <g className="path-draft">
+                    <polyline
+                      points={[first, ...p.draftPoints].map((q) => `${q.x},${q.y}`).join(' ')}
+                    />
+                    {p.draftPoints.map((q, i) => (
+                      <circle key={i} cx={q.x} cy={q.y} r="5" />
+                    ))}
+                  </g>
+                ) : null;
+              })()}
             {p.walking && p.currentStep && (
               <g transform={`translate(${p.currentStep.x} ${p.currentStep.y})`}>
                 <circle r="14" className="position-marker" />
@@ -325,7 +357,7 @@ export function MapView(p: Props) {
           <>
             <button className="editor-toggle" onClick={() => setSource((s) => !s)}>
               <Icon name={source ? 'map' : 'layers'} size={16} />
-              {source ? 'Generated map' : 'Source image'}
+              {source ? 'Simplified view' : 'Original layout'}
             </button>
             <button
               className={`editor-toggle ${p.edit !== 'none' ? 'active' : ''}`}
@@ -386,8 +418,15 @@ export function MapView(p: Props) {
           <p>
             {p.edit === 'pin'
               ? 'Click the map to add a place. Keyboard: focus the map and press Enter.'
-              : 'Select two places to add a verified walkway.'}
+              : p.edit === 'move'
+                ? 'Click the correct entrance to move this pin. Connected paths will need review.'
+                : 'Select a start pin, click each bend along the walkway, then select the end pin.'}
           </p>
+          {p.edit === 'connect' && p.draftPoints.length > 0 && (
+            <button className="text-button" onClick={p.onUndoPoint}>
+              Undo last bend
+            </button>
+          )}
           {p.edit === 'connect' && (
             <label>
               <input
@@ -467,6 +506,9 @@ export function MapView(p: Props) {
               paths
             </small>
           </span>
+          <button className="text-button" onClick={() => p.onEdit('move')}>
+            Move pin
+          </button>
           <button className="icon-button" onClick={p.onDelete} aria-label={`Delete ${place.name}`}>
             <Icon name="trash" size={18} />
           </button>

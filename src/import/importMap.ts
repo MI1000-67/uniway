@@ -40,7 +40,7 @@ export async function importImages(
       throw new Error('Choose JPG, PNG, or WebP map images.');
     if (f.size > 15_000_000) throw new Error('Each image must be smaller than 15 MB.');
   }
-  progress('Loading the local text reader…');
+  progress('Loading on-device AI…');
   const { createWorker, PSM } = await import('tesseract.js');
   if (signal.aborted) throw new DOMException('Import cancelled', 'AbortError');
   const worker = await createWorker('eng', 1, {
@@ -86,9 +86,17 @@ export async function importImages(
       context.fillRect(0, 0, canvas.width, canvas.height);
       context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
       bitmap.close();
-      const data = canvas.toDataURL('image/jpeg', 0.88);
-      const result = await worker.recognize(data, {}, { blocks: true });
-      const rasterScale = Math.min(1, 320 / canvas.width, 320 / canvas.height);
+      const data = canvas.toDataURL('image/jpeg', 0.94);
+      const ocr = document.createElement('canvas');
+      const readingScale = Math.min(3, 2400 / Math.max(canvas.width, canvas.height));
+      ocr.width = Math.round(canvas.width * readingScale);
+      ocr.height = Math.round(canvas.height * readingScale);
+      const reading = ocr.getContext('2d')!;
+      reading.imageSmoothingEnabled = true;
+      reading.imageSmoothingQuality = 'high';
+      reading.drawImage(canvas, 0, 0, ocr.width, ocr.height);
+      const result = await worker.recognize(ocr, {}, { blocks: true });
+      const rasterScale = Math.min(1, 640 / canvas.width, 640 / canvas.height);
       const width = Math.max(10, Math.round(canvas.width * rasterScale)),
         height = Math.max(10, Math.round(canvas.height * rasterScale));
       const small = document.createElement('canvas');
@@ -96,16 +104,17 @@ export async function importImages(
       small.height = height;
       const c = small.getContext('2d')!;
       c.drawImage(canvas, 0, 0, width, height);
-      const ratio = width / canvas.width;
+      const ratioX = width / ocr.width,
+        ratioY = height / ocr.height;
       const lines = (result.data.blocks ?? [])
         .flatMap((block) => block.paragraphs.flatMap((paragraph) => paragraph.lines))
         .map((line) => ({
           text: line.text,
           confidence: line.confidence,
-          x: line.bbox.x0 * ratio,
-          y: line.bbox.y0 * ratio,
-          width: (line.bbox.x1 - line.bbox.x0) * ratio,
-          height: (line.bbox.y1 - line.bbox.y0) * ratio,
+          x: line.bbox.x0 * ratioX,
+          y: line.bbox.y0 * ratioY,
+          width: (line.bbox.x1 - line.bbox.x0) * ratioX,
+          height: (line.bbox.y1 - line.bbox.y0) * ratioY,
         }));
       progress('Turning the layout into an interactive map…');
       const generated = await analyzeInWorker(
@@ -123,6 +132,7 @@ export async function importImages(
         buildings: generated.buildings,
         roads: generated.roads,
         warnings: generated.warnings,
+        unplacedLabels: generated.unplacedLabels,
         reviewed: false,
       } as MapImage);
     }

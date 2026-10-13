@@ -202,7 +202,13 @@ export function validateMap(raw) {
           b.x + b.width <= 1000 &&
           b.y + b.height <= 800,
       )
-      .map((b) => ({ x: b.x, y: b.y, width: b.width, height: b.height }));
+      .map((b) => ({
+        x: b.x,
+        y: b.y,
+        width: b.width,
+        height: b.height,
+        color: /^#[0-9a-f]{6}$/i.test(b.color) ? b.color : undefined,
+      }));
     const roads = (Array.isArray(i.roads) ? i.roads : [])
       .slice(0, 1500)
       .filter((r) => Array.isArray(r) && r.length <= 200 && r.every(point))
@@ -213,6 +219,16 @@ export function validateMap(raw) {
       buildings,
       roads,
       reviewed: i.reviewed === true,
+      unplacedLabels: (Array.isArray(i.unplacedLabels) ? i.unplacedLabels : [])
+        .slice(0, 500)
+        .filter((l) => l && typeof l.name === 'string' && l.name.trim())
+        .map((l) => ({
+          name: l.name.slice(0, 100),
+          color: /^#[0-9a-f]{6}$/i.test(l.color) ? l.color : undefined,
+          confidence: Number.isFinite(l.confidence)
+            ? Math.max(0, Math.min(100, l.confidence))
+            : undefined,
+        })),
       warnings: (Array.isArray(i.warnings) ? i.warnings : [])
         .filter((w) => typeof w === 'string')
         .slice(0, 10),

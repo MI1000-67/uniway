@@ -3050,3 +3050,74 @@ button:active:not(:disabled) {
 [data-theme='dark'] .destination-card h2 {
   color: var(--text);
 }
+
+/* Keep small imported plans legible; details appear on selection or keyboard focus. */
+.custom-map .map-pin .pin-label {
+  opacity: 0;
+  pointer-events: none;
+}
+.custom-map .map-pin:is(.selected, :hover, :focus-visible) .pin-label {
+  opacity: 1;
+}
+.map-pin .pin-number {
+  fill: white;
+  font-size: 15px;
+  font-weight: 700;
+  pointer-events: none;
+}
+.custom-map .map-pin > circle:not(.pin-hit) {
+  fill: #244e43;
+  stroke: white;
+  stroke-width: 3;
+}
+.path-draft polyline {
+  fill: none;
+  stroke: #a44f35;
+  stroke-width: 5;
+  stroke-dasharray: 9 6;
+}
+.path-draft circle {
+  fill: #a44f35;
+  stroke: white;
+  stroke-width: 2;
+}
+.unplaced-labels {
+  margin: 20px 0;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+.unplaced-labels p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.unplaced-labels button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: inherit;
+  border: 0;
+}
+.unplaced-labels button span {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  flex: 0 0 auto;
+}
+.unplaced-labels button svg {
+  margin-left: auto;
+}
+.review-pin-number {
+  min-width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  background: #244e43;
+  color: white;
+  border-radius: 50%;
+  font-size: 12px;
+}

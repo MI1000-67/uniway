@@ -1,4 +1,5 @@
 import { categoryFor, polylineLength } from '../engine.mjs';
+import { paletteRegions, legendSwatches, colorDistance, cleanLegendName } from './palette.mjs';
 
 export function components(mask, width, height) {
   const seen = new Uint8Array(mask.length),
@@ -247,80 +248,56 @@ function connectPlace(place, graph, floor) {
 }
 
 export function analyzeRaster({ pixels, width, height, lines, floor = 0 }) {
-  if (width < 10 || height < 10 || pixels.length !== width * height * 4)
+  if (
+    width < 10 ||
+    height < 10 ||
+    width > 1000 ||
+    height > 1000 ||
+    pixels.length !== width * height * 4
+  )
     throw new Error('Invalid map pixels.');
   const scale = Math.min(1000 / width, 800 / height),
     offsetX = (1000 - width * scale) / 2,
     offsetY = (800 - height * scale) / 2;
   const toPoint = (x, y) => ({ x: offsetX + x * scale, y: offsetY + y * scale });
-  const rect = (c) => ({ ...toPoint(c.x, c.y), width: c.width * scale, height: c.height * scale });
-  const colored = new Uint16Array(width * height),
-    white = new Uint8Array(width * height),
-    gray = new Uint8Array(width * height);
-  for (let i = 0; i < white.length; i++) {
-    const r = pixels[i * 4],
-      g = pixels[i * 4 + 1],
-      b = pixels[i * 4 + 2],
-      max = Math.max(r, g, b),
-      min = Math.min(r, g, b),
-      light = (r + g + b) / 3;
-    if (max - min > 45 && light > 45 && light < 235)
-      colored[i] = 1 + (r >> 5) * 64 + (g >> 5) * 8 + (b >> 5);
-    white[i] = min > 235 ? 1 : 0;
-    gray[i] = max - min < 30 && light > 100 && light < 233 ? 1 : 0;
-  }
-  const colorRegions = components(colored, width, height).filter(
-    (c) => c.pixels.length > 8 && c.pixels.length / (c.width * c.height) > 0.55,
+  const rect = (c) => ({
+    ...toPoint(c.x, c.y),
+    width: c.width * scale,
+    height: c.height * scale,
+    color: c.color,
+  });
+  const regions = paletteRegions(pixels, width, height, components);
+  const swatches = legendSwatches(regions, width, height);
+  const swatchSet = new Set(swatches);
+  const buildingRegions = regions.filter(
+    (c) =>
+      !swatchSet.has(c) &&
+      !c.border &&
+      c.pixels.length > Math.max(8, width * height * 0.000025) &&
+      c.width < width * 0.6 &&
+      c.height < height * 0.6,
   );
-  const whiteRegions = components(white, width, height).filter(
-    (c) => !c.border && c.pixels.length > 35,
-  );
-  const isBuilding = (c) =>
-    c.width >= 6 &&
-    c.height >= 5 &&
-    Math.max(c.width / c.height, c.height / c.width) < 4 &&
-    c.pixels.length / (c.width * c.height) > 0.55 &&
-    c.width < width * 0.45 &&
-    c.height < height * 0.45;
-  const buildingRegions = [
-    ...colorRegions.filter((c) => c.pixels.length > 50 && isBuilding(c)),
-    ...whiteRegions.filter(isBuilding),
-  ].slice(0, 300);
-  const buildings = buildingRegions.map(rect);
-  const roadMask = new Uint8Array(white.length);
-  const looksLikeRoad = (c) =>
-    c.pixels.length >= 40 &&
-    (Math.max(c.width / c.height, c.height / c.width) > 4 ||
-      (c.width > width * 0.25 &&
-        c.height > height * 0.2 &&
-        c.pixels.length / (c.width * c.height) < 0.45));
-  for (const c of [...components(gray, width, height), ...whiteRegions].filter(looksLikeRoad))
-    for (const p of c.pixels) roadMask[p] = 1;
-  for (const b of buildingRegions)
-    for (let y = b.y; y < b.y + b.height; y++)
-      for (let x = b.x; x < b.x + b.width; x++) roadMask[y * width + x] = 0;
-  const skeleton = skeletonize(roadMask, width, height),
-    graph = traceGraph(skeleton, width, height, toPoint, floor);
-  if (graph.junctions.length > 900 || graph.edges.length > 2400) {
-    graph.junctions = [];
-    graph.edges = [];
-  }
+  const inLegend = (x, y) =>
+    swatches.some(
+      (c) => Math.abs(y - c.y - c.height / 2) < Math.max(c.height * 1.8, 10) && x >= c.x - 5,
+    );
   const normalized = lines
     .map((l) => ({ ...l, text: l.text.replace(/[|_]+/g, ' ').replace(/\s+/g, ' ').trim() }))
     .filter((l) => l.confidence >= 45 && /[A-Za-z]{3}/.test(l.text));
   const title = normalized.find(
-    (l) => l.y < height * 0.12 && /university|campus|faculty/i.test(l.text),
+    (l) => l.y < height * 0.15 && /university|campus|faculty/i.test(l.text),
   )?.text;
   const places = [],
-    legendLines = new Set();
-  const addPlace = (name, x, y, confidence) => {
+    unplacedLabels = [],
+    usedLines = new Set(),
+    usedBuildings = new Set();
+  const addPlace = (name, x, y, confidence, description) => {
     if (
-      name.length < 3 ||
-      name.length > 90 ||
+      name.length < 4 ||
+      name.length > 100 ||
+      places.length >= 500 ||
       places.some(
-        (p) =>
-          p.name.toLowerCase() === name.toLowerCase() &&
-          Math.hypot(p.x - toPoint(x, y).x, p.y - toPoint(x, y).y) < 80,
+        (p) => p.name === name && Math.hypot(p.x - toPoint(x, y).x, p.y - toPoint(x, y).y) < 40,
       )
     )
       return;
@@ -332,84 +309,160 @@ export function analyzeRaster({ pixels, width, height, lines, floor = 0 }) {
       floor,
       confidence,
       description:
+        description ||
         'Read from your layout. Check the label and entrance before following directions.',
     });
   };
-  for (const line of normalized) {
-    const key = colorRegions
+  for (const swatch of swatches) {
+    const cy = swatch.y + swatch.height / 2;
+    const line = normalized
+      .filter(
+        (l) =>
+          l.text !== title &&
+          !usedLines.has(l) &&
+          l.x + l.width > swatch.x + swatch.width &&
+          Math.abs(l.y + l.height / 2 - cy) < Math.max(swatch.height * 1.2, l.height),
+      )
+      .sort((a, b) => Math.abs(a.y + a.height / 2 - cy) - Math.abs(b.y + b.height / 2 - cy))[0];
+    if (!line) continue;
+    usedLines.add(line);
+    const name = cleanLegendName(line.text);
+    const candidates = buildingRegions
       .filter(
         (c) =>
-          c.width < 10 &&
-          c.height < 10 &&
-          c.x < line.x &&
-          line.x - c.x - c.width < width * 0.06 &&
-          Math.abs(c.y + c.height / 2 - line.y - line.height / 2) < Math.max(line.height, 6),
+          c.pixels.length > swatch.pixels.length * 0.25 &&
+          !usedBuildings.has(c) &&
+          !inLegend(c.x + c.width / 2, c.y + c.height / 2),
       )
-      .sort((a, b) => b.x - a.x)[0];
-    if (!key) continue;
-    const target = buildingRegions
-      .filter((c) => c.value === key.value && c.pixels.length > key.pixels.length * 2)
-      .sort((a, b) => b.pixels.length - a.pixels.length)[0];
-    if (target) {
-      addPlace(
-        line.text.replace(/^[A-Z0-9]{1,3}\s*[-–:.,]\s*/i, ''),
-        target.x + target.width / 2,
-        target.y + target.height / 2,
-        line.confidence,
-      );
-      legendLines.add(line);
-    }
-  }
-  for (const line of normalized) {
+      .map((c) => ({ c, d: colorDistance(c.rgb, swatch.rgb) }))
+      .filter((v) => v.d < 95)
+      .sort((a, b) => a.d - b.d);
     if (
-      legendLines.has(line) ||
+      swatches.some((other) => other !== swatch && colorDistance(other.rgb, swatch.rgb) < 18) ||
+      !candidates.length ||
+      (candidates.length > 1 && candidates[1].d - candidates[0].d < 8)
+    ) {
+      unplacedLabels.push({ name, confidence: line.confidence, color: swatch.color });
+      continue;
+    }
+    const target = candidates[0].c;
+    usedBuildings.add(target);
+    addPlace(
+      name,
+      target.x + target.width / 2,
+      target.y + target.height / 2,
+      line.confidence,
+      'Matched from the colour legend. Move the pin to the real entrance before connecting a path.',
+    );
+  }
+  const useful =
+    /library|lecture|caf[eé]|canteen|entrance|student|department|faculty|laboratory|auditorium|health|garden|sport|hall|office|room|centre|center|complex/i;
+  for (const line of normalized) {
+    const x = line.x + line.width / 2,
+      y = line.y + line.height / 2;
+    if (
+      usedLines.has(line) ||
       line.text === title ||
+      inLegend(x, y) ||
+      line.confidence < 65 ||
+      !useful.test(line.text) ||
       /\b(road|path|walk|corridor|legend|scale|north|copyright|metres|meters)\b/i.test(line.text) ||
       line.text.split(' ').length > 10
     )
       continue;
-    const x = line.x + line.width / 2,
-      y = line.y + line.height / 2;
-    const building = buildingRegions.find(
-      (c) => x >= c.x - 2 && x <= c.x + c.width + 2 && y >= c.y - 2 && y <= c.y + c.height + 2,
-    );
     if (
-      building ||
-      /library|lecture|caf[eé]|canteen|gate|entrance|student|department|faculty|laboratory|auditorium|health|garden|sport|hall|office|room|centre|center/i.test(
-        line.text,
+      [...usedBuildings].some(
+        (c) => x >= c.x - 3 && x <= c.x + c.width + 3 && y >= c.y - 3 && y <= c.y + c.height + 3,
       )
     )
-      addPlace(line.text, x, y, line.confidence);
+      continue;
+    addPlace(line.text, x, y, line.confidence);
+  }
+  // Solid road bands can be proposed; white gaps, thin outlines, text and page frames cannot.
+  const gray = new Uint8Array(width * height);
+  const margin = Math.max(3, Math.round(Math.min(width, height) * 0.025));
+  for (let y = margin; y < height - margin; y++)
+    for (let x = margin; x < width - margin; x++) {
+      const i = y * width + x,
+        r = pixels[i * 4],
+        g = pixels[i * 4 + 1],
+        b = pixels[i * 4 + 2];
+      if (
+        Math.max(r, g, b) - Math.min(r, g, b) < 18 &&
+        Math.min(r, g, b) > 110 &&
+        Math.max(r, g, b) < 225 &&
+        !inLegend(x, y) &&
+        !swatches.some((c) => c.x > width * 0.55 && x >= c.x - 5)
+      )
+        gray[i] = 1;
+    }
+  for (const l of lines)
+    for (let y = Math.max(0, Math.floor(l.y - 2)); y < Math.min(height, l.y + l.height + 2); y++)
+      for (let x = Math.max(0, Math.floor(l.x - 2)); x < Math.min(width, l.x + l.width + 2); x++)
+        gray[y * width + x] = 0;
+  // Require a genuine band interior: anti-aliased single-pixel boundaries have none.
+  const roadMask = new Uint8Array(gray.length);
+  for (const c of components(gray, width, height)) {
+    if (
+      c.x <= margin ||
+      c.y <= margin ||
+      c.x + c.width >= width - margin ||
+      c.y + c.height >= height - margin ||
+      c.pixels.length < 60
+    )
+      continue;
+    let interior = 0;
+    for (const i of c.pixels)
+      if (
+        gray[i - 1] &&
+        gray[i + 1] &&
+        gray[i - width] &&
+        gray[i + width] &&
+        gray[i - 2] &&
+        gray[i + 2] &&
+        gray[i - 2 * width] &&
+        gray[i + 2 * width]
+      )
+        interior++;
+    const elongated = Math.max(c.width / c.height, c.height / c.width) > 4;
+    if (interior / c.pixels.length < 0.16 || !elongated) continue;
+    for (const i of c.pixels) roadMask[i] = 1;
+  }
+  const graph = traceGraph(skeletonize(roadMask, width, height), width, height, toPoint, floor);
+  if (graph.junctions.length > 120 || graph.edges.length > 180) {
+    graph.junctions = [];
+    graph.edges = [];
   }
   let connected = 0;
   for (const place of places) if (connectPlace(place, graph, floor)) connected++;
   const warnings = [];
   if (!places.length)
     warnings.push(
-      'No clear place labels were found. Try a sharper photo or add the missing places.',
+      'No reliable destination positions were found. Keep the source visible and place labels where they belong.',
+    );
+  if (unplacedLabels.length)
+    warnings.push(
+      'Some legend colours are ambiguous. Review any labels still waiting for placement.',
     );
   if (!graph.edges.length)
     warnings.push(
-      'No distinct path network was found. Open white space is not treated as a road. Add verified paths in the editor.',
+      'No distinct path network could be verified from the image. Trace the walkways on the original layout to enable routes.',
     );
   else
     warnings.push(
-      'Detected paths and entrances are estimates. Compare them with the source before starting directions.',
+      'Path candidates need review. Check every segment and entrance before using directions.',
     );
   if (connected < places.length)
-    warnings.push(
-      `${places.length - connected} place${places.length - connected === 1 ? ' is' : 's are'} not connected to a detected path.`,
-    );
-  warnings.push(
-    'The map has no real-world scale. Route lengths are compared relative to one another.',
-  );
+    warnings.push('Check that each destination has a traced connection to the walkway network.');
+  warnings.push('Distances and geographic north are not calibrated.');
   return {
     title,
     places,
     ...graph,
-    buildings,
+    buildings: buildingRegions.map(rect),
     roads: graph.edges.map((e) => e.points),
     warnings,
+    unplacedLabels,
     reviewed: false,
   };
 }
