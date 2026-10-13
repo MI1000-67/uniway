@@ -17,11 +17,11 @@ UniWay is a static browser application. There is no account service or upload en
 ## Import and review
 
 1. Accept up to eight raster images, at most 15 MB each and 40 megapixels per decoded image.
-2. Resize to at most 1,600 pixels on the longest side for OCR. Load English model assets from the same host, on demand.
-3. Read labels with bounding boxes, then analyze a raster with a longest side near 320 pixels in a worker.
-4. Detect colour regions and road-like shapes; skeletonize candidate roads and connect nearby labels with candidate entrance segments.
-5. Show the generated geometry alongside the source. Every detected edge starts unconfirmed and not step-free.
-6. Enable directions after explicit review. Step-free status is checked separately. A manual correction is still needed when a label centre is not the actual entrance.
+2. Keep a source image up to 1,600 pixels on its longest side. Use a separate OCR canvas enlarged up to 3× and capped at 2,400 pixels. Load the compact quantized English LSTM model from the same host, on demand.
+3. Read labels with bounding boxes, then analyze a raster with a longest side near 640 pixels in a worker.
+4. Match distinct colour legend entries to buildings, retain ambiguous labels for manual placement, exclude thin outlines and legend sidebar marks; skeletonize candidate roads and connect nearby labels with candidate entrance segments.
+5. Show numbered pins over the original source by default. Allow users to move pins and trace walkway bends. Every detected edge starts unconfirmed and not step-free.
+6. Enable directions after explicit review. Moving a pin invalidates attached path and accessibility confirmations. Step-free status is checked separately. A manual correction is still needed when a label centre is not the actual entrance.
 
 This is heuristic computer vision and OCR, not a general-purpose model that understands arbitrary maps. It can miss paths or confuse walls, legends and roads. No clear path network means no invented route through blank space.
 

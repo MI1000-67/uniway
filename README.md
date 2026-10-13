@@ -36,8 +36,8 @@ Deploy `dist/` to a static host at the origin root. Use HTTPS for camera access.
 - Search destinations, categories and saved places. Search handles accents, small spelling errors and map aliases.
 - Pan, zoom and rotate the map with controls, keyboard or two fingers. The compass resets orientation.
 - Compare up to three loop-free routes, ranked by mapped distance, and filter for paths marked step-free.
-- Import up to eight JPG, PNG or WebP layouts. On-demand local OCR reads English labels; image processing proposes building shapes and path candidates.
-- Compare the generated map with the original, correct labels, remove false paths, and add missing destinations and walkways.
+- Import up to eight JPG, PNG or WebP layouts. On-demand local OCR reads English labels; a compact neural model reads upscaled text and colour matching links legend entries to buildings.
+- Keep the original layout visible with numbered pins. Place ambiguous labels, move pins to entrances, remove false paths and trace walkways around bends.
 - Open demo campus links through QR entry, with a link fallback when camera decoding is unavailable.
 - Use day/night themes and a three-hour session countdown. Browser session data is cleared on expiry, including when you return to a sleeping tab.
 
@@ -61,6 +61,8 @@ We welcome small, useful contributions: a reproducible bug, clearer wording, a t
 
 ## Project notes
 
+- [60-hour plan and honest work log](WORKLOG.md)
+- [Layout import improvement report](docs/reports/04-layout-import.md)
 - [Architecture](docs/architecture.md)
 - [Before work: goals and risks](docs/reports/01-before-work.md)
 - [During work: findings and decisions](docs/reports/02-during-work.md)
