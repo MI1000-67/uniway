@@ -31,3 +31,11 @@ English OCR can miss labels, and road-like shapes can be wrong. Entrances need m
 Before a student pilot, use the device checklist, benchmark representative phones and maps, and obtain authoritative campus route data with review evidence. Before wider community promotion, configure a private reporting channel and verify the repository's hosted demo access.
 
 The GitHub publication outcome is recorded after the remote branch update; source and live-site deployment are separate operations. Do not infer a new live version from a GitHub push alone.
+
+## Publication verified
+
+The 64-file public source release was merged through [pull request #1](https://github.com/MI1000-67/uniway/pull/1). Its [GitHub CI run](https://github.com/MI1000-67/uniway/actions/runs/38436813980) completed successfully before merge. The merge commit is `2c89dd0773f4195256ff37fafbdf369fe62af828`.
+
+The updated hosted app was separately packaged from Sites source commit `8eff7c8b595ea1107f45ef22a5c20865c15b3609` and deployed successfully at https://uniway-campus.mellowmite10.chatgpt.site. Its existing owner-private access was preserved. Browser/device/field limits listed above still apply.
+
+Repository administration changes (topics, branch protection, Discussions and private reporting) and outreach remain pending. No outreach messages were sent.
