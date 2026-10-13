@@ -1,6 +1,6 @@
 # Work plan and time record
 
-Requested project window: **10 May–12 October 2026**. Target effort: **60 hours**.
+Requested project window: **10 May–13 October 2026**. Target effort: **60 hours**.
 
 This is a planning target, not a claim that 60 hours were worked. Historical timesheets or session notes have not been supplied. Actual hours for this window are **not yet verified**. GitHub commit dates show when changes were recorded; they do not measure time spent working.
 
@@ -27,7 +27,7 @@ No historical entries have been verified yet. Add one row per real work session 
 
 Use actual notes, calendar records or a time tracker to fill this table. If a past duration is reconstructed from memory, label it **estimated** and explain the basis. Keep human active time, unattended processing and AI-assisted work clear; overlapping sessions must not be counted twice. Do not change commit timestamps to make the calendar look fuller.
 
-The 0.2.0 and 0.3.0 publication and fix work recorded on **13 October 2026** falls outside the requested window. It must stay outside the May–October 12 total. This repository records AI assistance; a tool session is not proof of the maintainer's human working hours.
+The 0.2.0 and 0.3.0 publication and fix work recorded on **13 October 2026** falls within the requested window. It may be included in the May–October 13 total if supported by session-level evidence. This repository records AI assistance; a tool session is not proof of the maintainer's human working hours.
 
 ## Before, during and after each task
 
