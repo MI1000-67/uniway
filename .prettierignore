@@ -1,0 +1,6 @@
+node_modules
+dist
+public/ocr
+package-lock.json
+public/fonts
+.openai
