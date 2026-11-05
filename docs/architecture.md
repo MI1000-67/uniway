@@ -1,38 +1,33 @@
-# How UniWay works
+# Engine architecture and extension points
 
-UniWay is a static browser application. There is no account service or upload endpoint in this release.
+The React shell renders the approved SVG campus or an uploaded raster. It owns temporary object URLs and independent prepared maps. No image is sent to a server or saved across reloads.
 
-| Area                               | Responsibility                                                                  |
-| ---------------------------------- | ------------------------------------------------------------------------------- |
-| `src/main.tsx`                     | App state, search, session lifecycle, import/review flows and route walkthrough |
-| `src/components/`                  | Map gestures, route options, timer, dialogs, theme switch and scanner           |
-| `src/import/importMap.ts`          | Bounded image loading, local OCR and cancellable analysis                       |
-| `src/import/vision.worker.ts`      | Runs layout processing away from the main UI thread                             |
-| `src/import/vision.mjs`            | Connected components, road skeletons, proposed graph and label placement        |
-| `src/engine.mjs`                   | Dijkstra routing, Yen alternatives, geometry, validation and expiry helpers     |
-| `src/search.mjs`                   | Accent normalization, aliases and small spelling-error matching                 |
-| `src/storage.ts`                   | IndexedDB session persistence                                                   |
-| `src/data.ts`, `src/CampusArt.tsx` | Fictional demonstration graph and vector artwork                                |
+```mermaid
+flowchart LR
+  Upload[Validated local image] --> OCR[Local OCR worker]
+  Upload --> Vision[Geometry worker]
+  OCR --> Labels[Number and color legend evidence]
+  Vision --> Labels
+  Labels --> Draft[Typed draft and unresolved labels]
+  Draft --> Editor[Place pins and verify paths]
+  Editor --> Graph[Reviewed graph]
+  Graph --> Routes[Dijkstra and Yen alternatives]
+```
 
-## Import and review
+| Module                     | Contract                                                                                                    |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `src/engine/index.ts`      | Cancellable browser orchestration; self-hosted OCR; 120-second job bound; disposes workers.                 |
+| `src/engine/imported/`     | Pure, bounded source-derived candidates in input pixels; no network, filenames, inferred edges or UI state. |
+| `src/engine/core.ts`       | Targeted digit recognition support, conservative neutral linework and approach points on that linework.     |
+| `src/engine/merge.ts`      | Independent X/Y coordinate scaling and evidence merging; conflicts remain unresolved.                       |
+| `src/engine/types.ts`      | OCR observations and analysis report, including reviewable regions.                                         |
+| `src/preparedMap.ts`       | Graph operations, review checks, pin movement and invalidation of attached accessibility flags.             |
+| `src/MapEditor.tsx`        | Manual corrections, unresolved-label placement, scale/north calibration and publication review.             |
+| `src/search.ts`            | Shared local search: names/aliases before prefixes/typos; preserve non-Latin vowel marks.                   |
+| `src/routeAlternatives.ts` | Loop-free alternatives from actual graph edges. Never pad results to three with invented routes.            |
 
-1. Accept up to eight raster images, at most 15 MB each and 40 megapixels per decoded image.
-2. Keep a source image up to 1,600 pixels on its longest side. Use a separate OCR canvas enlarged up to 3× and capped at 2,400 pixels. Load the compact quantized English LSTM model from the same host, on demand.
-3. Read labels with bounding boxes, then analyze a raster with a longest side near 640 pixels in a worker.
-4. Match distinct colour legend entries to buildings, retain ambiguous labels for manual placement, exclude thin outlines and legend sidebar marks; skeletonize candidate roads and connect nearby labels with candidate entrance segments.
-5. Show numbered pins over the original source by default. Allow users to move pins and trace walkway bends. Every detected edge starts unconfirmed and not step-free.
-6. Enable directions after explicit review. Moving a pin invalidates attached path and accessibility confirmations. Step-free status is checked separately. A manual correction is still needed when a label centre is not the actual entrance.
+OCR preparation uses at most 1600 pixels on the long side; geometry uses at most 1000. Original-image coordinates are restored with separate width and height ratios, including rounding. Indoor detection proposes room outlines and labels, not door connectivity. Multi-image floor relationships need explicit future data and review; matching stair names are insufficient evidence.
 
-This is heuristic computer vision and OCR, not a general-purpose model that understands arbitrary maps. It can miss paths or confuse walls, legends and roads. No clear path network means no invented route through blank space.
+To add an extractor, implement a pure candidate function with synthetic tests. Return observations and uncertainty, not authoritative navigation. Run expensive work in the analysis worker, preserve cancellation, and benchmark unknown maps before making accuracy claims. New runtime/model dependencies must stay local and have a reproducible asset manifest.
 
-## Routing
-
-All edges are bidirectional in this prototype. Dijkstra finds the shortest mapped distance; Yen's algorithm supplies up to three distinct loop-free alternatives. Polyline geometry determines length when present. Imported maps compare distances in layout units; only the fictional demo has an illustrative metre scale. No GPS tracking occurs. Direction steps advance manually.
-
-## Session and theme
-
-An absolute timestamp determines the three-hour expiry. The app checks it each second and on focus/visibility changes. Expiry aborts active import and clears in-memory session content and IndexedDB. Theme preference lives under `uniway-theme` in localStorage and is applied before first paint through one root attribute.
-
-## Hosting
-
-Run `npm run build` and serve `dist/` at the origin root. Asset URLs currently assume root hosting. The optional `.openai/hosting.json` binds the original Sites project, so a fork should remove that identity before registering a new Site. Never reuse the original project ID to publish a fork.
+See [migration decisions](../ENGINE_MIGRATION.md) for source defects excluded from the port and [engine direction](../ENGINE_PLAN.md) for dataset and model evaluation work still needed.

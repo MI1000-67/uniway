@@ -1,0 +1,53 @@
+{
+  "runtime": "tesseract.js 6.0.1",
+  "languages": [
+    {
+      "language": "eng",
+      "source": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/4.1.0/eng.traineddata",
+      "bytes": 4113088,
+      "sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2"
+    },
+    {
+      "language": "tam",
+      "source": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/4.1.0/tam.traineddata",
+      "bytes": 3237963,
+      "sha256": "d02fbec24be4b07e32e80d0ccfc3b6b67a3c5d61c9d0a7c8532677990912c6ec"
+    },
+    {
+      "language": "sin",
+      "source": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/4.1.0/sin.traineddata",
+      "bytes": 1727413,
+      "sha256": "bc75c6df2375a30c9f7e759fa7d4b58ae3ecf9ce72668a702d01acb13e551422"
+    },
+    {
+      "language": "hin",
+      "source": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/4.1.0/hin.traineddata",
+      "bytes": 1122751,
+      "sha256": "4c73ffc59d497c186b19d1e90f5d721d678ea6b2e277b719bee4e2af12271825"
+    },
+    {
+      "language": "ara",
+      "source": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/4.1.0/ara.traineddata",
+      "bytes": 1432056,
+      "sha256": "e3206d3dc87fd50c24a0fb9f01838615911d25168f4e64415244b67d2bb3e729"
+    },
+    {
+      "language": "spa",
+      "source": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/4.1.0/spa.traineddata",
+      "bytes": 2294433,
+      "sha256": "6f2e04d02774a18f01bed44b1111f2cd7f3ba7ac9dc4373cd3f898a40ea6b464"
+    },
+    {
+      "language": "fra",
+      "source": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/4.1.0/fra.traineddata",
+      "bytes": 1130365,
+      "sha256": "ced037562e8c80c13122dece28dd477d399af80911a28791a66a63ac1e3445ca"
+    },
+    {
+      "language": "deu",
+      "source": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/4.1.0/deu.traineddata",
+      "bytes": 1525436,
+      "sha256": "19d219bbb6672c869d20a9636c6816a81eb9a71796cb93ebe0cb1530e2cdb22d"
+    }
+  ]
+}

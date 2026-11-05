@@ -1,76 +1,63 @@
-# UniWay
+# Uniway
 
-**Find your way, feel at home.**
+A mobile-first interactive campus navigation prototype built with React, TypeScript, Vite, and an illustrated SVG map. Willowbrook University is fictional; all paths and distances are demo data.
 
-Starting university should feel exciting. Finding a lecture hall should not take half the morning. UniWay turns a campus layout into a searchable, interactive map, with walking routes and a temporary browser session.
+## Run locally
 
-This is an open-source prototype built with React, TypeScript and Vite. The included Greenfield campus is fictional. Real map imports need a person to check the labels, entrances and paths before directions are enabled.
-
-## Try it locally
-
-You need Node.js 22 LTS or a supported Node version at least 20.19, and npm.
-
-```bash
-git clone https://github.com/MI1000-67/uniway.git
-cd uniway
-npm ci
+```sh
+npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite. The first start copies the English OCR model and worker from installed packages into `public/ocr/`. Images are processed in your browser. No API key or paid AI service is required.
+Open the localhost address printed by Vite. On Windows PowerShell, use `npm.cmd` if script execution policy blocks `npm`.
 
-For a production build:
-
-```bash
-npm run check
+```sh
 npm test
 npm run build
-npm run test:ocr
 npm run preview
 ```
 
-Deploy `dist/` to a static host at the origin root. Use HTTPS for camera access. The included QR image points to the original UniWay hosted demo; if you deploy elsewhere, regenerate that QR for your own origin. The copied share link uses your current origin.
+## Try the app
 
-## What works today
+- Search for the library, select it, and choose **Get directions**. Choose West Gate as the start, then enable **Step-free route** to see the library ramp alternative.
+- Pan, zoom, fit the campus or selected route, and use the compass to rotate the actual map. Calibrate printed north for uploaded maps in the editor. Optional device headings require a supported sensor, HTTPS/localhost, and browser permission; manual rotation works without a sensor.
+- Compare up to three loop-free routes: green solid, amber dashed, and terracotta dotted. Distances and instructions follow the selected route. Fewer choices appear when the graph has fewer alternatives; overlapping portions are shared paths.
+- Use the sun/moon button in the header to switch between day and night mode, including the campus map and dialogs. Your choice is remembered on this browser; first visits follow your device appearance. If storage is unavailable, the toggle still works for the current visit.
+- The glass interface floats over the full-screen map, with `#058C42` accents, softly blurred panels, subtle edges, and rounded controls in both themes. Night mode adds warm street lamps to the fictional campus; uploaded images retain their original colors. Reduced-transparency preferences use opaque surfaces; reduced-motion preferences disable movement effects.
+- Select **Scan QR**, then **Just looking around?** to start a three-hour visitor session. Alternatively scan/upload a QR containing `uniway://willowbrook/south-gate`, `uniway://willowbrook/west-gate`, or `uniway://willowbrook/north-gate`.
+- Camera scanning requires HTTPS or localhost. QR decoding is loaded only when needed. Closing the scanner stops all camera tracks.
+- **Upload a map** accepts JPEG, PNG, and WebP images up to 15 MB each. Choose the printed layout language and **Make this map interactive**. Local OCR reads names and numbered keys; image analysis proposes visible neutral linework. Review the detected names, approach points, and paths before opening directions. **Open map preview** is always available, including when no paths can be extracted. Manual preparation remains available.
+- In the editor, enable step-free only for paths you have verified. Paths connect at shared numbered points; crossing lines alone do not form a junction. Use **Set scale** to mark two points and enter a known distance in metres. Without calibration, navigation shows the path without invented distance or time estimates.
+- Images, drafts, and prepared maps stay in browser memory for this open tab and are never uploaded to a server. Reloading clears them. Editing a draft does not change the currently published map until it is reviewed again.
+- On mobile, expand or collapse the bottom sheet using its handle. The visitor countdown is in the expanded panel footer.
 
-- Search destinations, categories and saved places. Search handles accents, small spelling errors and map aliases.
-- Pan, zoom and rotate the map with controls, keyboard or two fingers. The compass resets orientation.
-- Compare up to three loop-free routes, ranked by mapped distance, and filter for paths marked step-free.
-- Import up to eight JPG, PNG or WebP layouts. On-demand local OCR reads English labels; a compact neural model reads upscaled text and colour matching links legend entries to buildings.
-- Keep the original layout visible with numbered pins. Place ambiguous labels, move pins to entrances, remove false paths and trace walkways around bends.
-- Open demo campus links through QR entry, with a link fallback when camera decoding is unavailable.
-- Use day/night themes and a three-hour session countdown. Browser session data is cleared on expiry, including when you return to a sleeping tab.
+## Architecture
 
-## What to expect
+- `src/campus.ts`: typed places, entrances, nodes, and undirected path edges with step-free metadata.
+- `src/routing.ts` / `src/routeAlternatives.ts`: Dijkstra and Yen route alternatives, walking estimates, and selected-route instructions. Networks above 400 nodes are routed in a worker for uploaded maps.
+- `src/engine/`: local Tesseract OCR, number/legend association, conservative neutral-linework extraction, thinning, paint-hole removal, graph simplification, and quality feedback. OCR and geometric extraction run in workers.
+- `src/MapPreparation.tsx`: language selection, cancellable analysis, progress, manual recovery, and always-available preview.
+- `src/MapCompass.tsx`: actual SVG rotation, printed-north calibration, optional absolute sensor headings, permission/error handling, and cleanup.
+- `src/CampusMap.tsx`: SVG campus, keyboard-selectable buildings, pan/zoom, route display, and map controls.
+- `src/appearance.css` / `src/StreetLamps.tsx`: shared day/night materials, responsive floating panels, and decorative demo street lamps. `src/mapView.ts` fits maps and routes into the space available around those panels.
+- `src/session.ts` / `src/useVisitorSession.ts`: absolute expiry timestamps, storage validation, focus/background recovery, and browser storage fallback.
+- `src/QRPanel.tsx`: camera/image decoding with lazy `jsqr`, entrance validation, and camera cleanup.
+- `src/UploadPanel.tsx`: validated local image previews and removal. App owns image object URLs and releases them when removed or unmounted.
+- `src/MapEditor.tsx` / `src/preparedMap.ts`: guided image preparation, editable places, path connections, accessibility flags, calibration, and graph validation.
+- `src/ImageMapCanvas.tsx` / `src/PreparedMapExplorer.tsx`: uploaded image map rendering, pan/zoom, keyboard placement, search, categories, and graph-based directions. Original image colors are preserved in both themes.
 
-OCR and path detection are suggestions. A photograph does not tell us whether a doorway is open, a route is safe, or a ramp meets someone's needs. Detected paths start unconfirmed; step-free access needs a separate check. Imported layouts have no geographic north or real-world distance scale. They show relative route lengths, not invented metres or arrival times.
+## Prototype boundaries
 
-Each image is a separate level. Cross-level routes, live location, published real-campus QR maps and full offline app loading are not implemented. Downloads have been removed. Once loaded, route calculation runs locally; reloading the app or loading OCR assets still needs the host unless the browser has retained them. This release is not an emergency navigation tool.
+There is no backend, authentication, live positioning, cloud vision, or API key. Local analysis uses pretrained OCR and image-processing rules; **no new Uniway model was trained**. Automatic conversion is a draft, not a guarantee for arbitrary maps: blurry photographs, multiple floors, hidden entrances, colored paths, and ambiguous linework may need manual preparation. The original image remains the base layer; this does not reconstruct a fully illustrated vector campus. Detected building labels and proposed road approach points are stored separately. Pedestrian access, entrances, scale, and step-free status require review. QR codes currently identify the fictional Willowbrook entrances only. An active QR session keeps its original expiry when rescanned; expired sessions require a fresh scan. Browser storage and expiry can be changed by the visitor and are **not security enforcement**.
 
-The hosted demo at https://uniway-campus.mellowmite10.chatgpt.site may require its owner's access. Public source does not automatically make that hosted instance public.
+For production, map preparation should extract labels and geometry once, require human verification of entrances and walkable paths, and publish a versioned navigation graph. Enforce visitor access and expiry on the server. Keep expensive inference out of the student navigation flow and evaluate any local model on representative maps and target devices.
 
-## Privacy
+## Local assets and privacy
 
-Uploaded map images remain in this browser. There is no analytics, external inference service or background location tracking. The camera starts after a button press and stops on close or page hide. The theme preference has its own storage key and survives session expiry.
+`public/ocr/` contains the runtime, eight language assets, licenses, and a SHA-256 manifest. The running app requests these from its own origin only, when preparation starts; it sends no map to a model service. `node scripts/setup-local-ocr.mjs` rebuilds these assets from pinned Tesseract trained-data sources and installed package versions (internet is needed for setup, not map processing). CSP headers in Vite restrict connections and scripts; apply equivalent headers if hosting elsewhere. Images and analysis are not persisted; reload clears them.
 
-Three-hour expiry is local cleanup, not server-enforced access revocation. It cannot erase screenshots, browser backups or files a person already copied. See [privacy and security](docs/privacy-and-security.md).
+## Evaluation
 
-## Help us improve it
+See [ENGINE_PLAN.md](ENGINE_PLAN.md) for the implementation decisions, evidence, limits, and next local-model training milestones. Tests cover routing, session expiry/recovery, QR, uploads, compass permissions/cleanup, extraction boundaries, cancellation, and review-gated previews. `npm test -- --maxWorkers=2` limits test-worker resource use.
 
-We welcome small, useful contributions: a reproducible bug, clearer wording, a test on a real phone, or a better import fixture. Start with [CONTRIBUTING.md](CONTRIBUTING.md), the [roadmap](docs/roadmap.md) and the [device test checklist](docs/testing.md). Use only maps and photos you have permission to share.
-
-## Project notes
-
-- [60-hour plan and honest work log](WORKLOG.md)
-- [Layout import improvement report](docs/reports/04-layout-import.md)
-- [Architecture](docs/architecture.md)
-- [Before work: goals and risks](docs/reports/01-before-work.md)
-- [During work: findings and decisions](docs/reports/02-during-work.md)
-- [After work: results and limits](docs/reports/03-after-work.md)
-- [Bug register](docs/bug-register.md)
-- [Community and outreach plan](docs/community-plan.md)
-- [Changelog](CHANGELOG.md)
-
-## License
-
-UniWay application code is available under the [MIT license](LICENSE). Bundled fonts retain their SIL Open Font License notices. OCR dependencies and model data retain their own licenses; see [third-party notices](THIRD_PARTY_NOTICES.md).
+This is a local-only build; no site has been published.

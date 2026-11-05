@@ -1,0 +1,166 @@
+.map-compass {
+  position: absolute;
+  right: 22px;
+  top: 82px;
+  z-index: 12;
+  color: var(--ink);
+}
+.map-compass-trigger {
+  position: relative;
+  width: 46px;
+  min-height: 53px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 1px solid var(--line);
+  background: var(--cream);
+  border-radius: 18px;
+  box-shadow: 0 3px 10px #10282012;
+}
+.map-compass-letter {
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+}
+.map-compass-trigger:hover {
+  background: var(--soft);
+}
+.map-compass-panel {
+  position: absolute;
+  width: min(285px, calc(100vw - 40px));
+  right: 0;
+  top: 64px;
+  padding: 16px;
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 12px 30px #10282020;
+  max-height: min(470px, calc(100dvh - 230px));
+  overflow: auto;
+  cursor: auto;
+  font-size: 12px;
+}
+.map-compass-panel header,
+.map-compass-panel header strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.map-compass-panel header {
+  justify-content: space-between;
+}
+.map-compass-panel header > button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+}
+.map-compass-panel p {
+  margin: 8px 0 12px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.map-compass-actions {
+  display: flex;
+  gap: 6px;
+}
+.map-compass-actions button {
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: var(--soft);
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+.map-compass-actions .map-compass-reset {
+  flex: 1;
+  font-weight: 700;
+}
+.map-compass-calibration {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 14px;
+  margin-bottom: 12px;
+}
+.compass-angle {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 14px 0;
+  font-size: 11px;
+}
+.compass-angle input {
+  width: 100%;
+  min-height: 28px;
+  accent-color: var(--ink);
+}
+.map-compass-calibration p {
+  margin-top: 14px;
+}
+.map-compass-calibration > button,
+.map-compass-align {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  background: var(--soft);
+  color: var(--green);
+  border-radius: 10px;
+  font-weight: 600;
+}
+.map-compass-sensor {
+  margin-top: 14px;
+}
+.map-compass-device {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+.map-compass-panel button:hover {
+  background: var(--soft);
+}
+.map-compass-reading {
+  margin: 14px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.map-compass-reading strong {
+  font-size: 22px;
+  font-weight: 600;
+}
+.map-compass-reading span {
+  font-size: 10px;
+  color: var(--muted);
+}
+.map-compass-panel p.map-compass-status {
+  margin-bottom: 0;
+}
+@media (max-width: 900px) {
+  .map-compass {
+    top: 90px;
+    right: 16px;
+  }
+  .map-compass-panel {
+    max-height: max(170px, calc(100dvh - 450px));
+  }
+}
+@media (forced-colors: active) {
+  .map-compass-trigger,
+  .map-compass-panel {
+    background: Canvas;
+    border-color: ButtonText;
+    box-shadow: none;
+  }
+}

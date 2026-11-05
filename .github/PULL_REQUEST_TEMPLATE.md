@@ -1,15 +1,11 @@
-## Problem and resulting behaviour
+## Change
 
-Describe the trigger and what changes for the user.
+Describe the problem and the resulting behavior.
 
-## Validation
+## Verification
 
-List the checks actually run and their results. Separate automated tests from browser/device/field evidence.
+List checks run and any remaining device or data limitations. For extraction changes, include a synthetic regression case and a negative case that must not create a route.
 
-## Remaining limits
+## Developer experience
 
-Mention known gaps that affect the change.
-
-## Review notes
-
-Identify data/asset permissions and AI assistance where relevant. Do not include credentials, private maps or invented hours.
+Describe changes to setup, public contracts or documentation. Keep private maps and generated assets out of this pull request.

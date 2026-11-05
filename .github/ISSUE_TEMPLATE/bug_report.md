@@ -1,22 +1,14 @@
 ---
 name: Bug report
-about: Tell us what went wrong and how to reproduce it
+about: Report a reproducible Uniway problem
 ---
 
-## What happened?
+**What happened and what did you expect?**
 
-## What did you expect?
+**Steps to reproduce**
 
-## Steps to reproduce
+**Browser, device and app version**
 
-1.
-2.
-3.
+**Map type and printed language (if relevant)**
 
-## Environment
-
-Device, OS, browser/version, app commit or version:
-
-## Evidence
-
-Screenshots or a small synthetic fixture help. Do not upload confidential plans or personal details. Tell us whether this is a visual issue, a route problem, an import error or session cleanup.
+Use a synthetic or permission-cleared example. Do not attach private maps, personal information or credentials.

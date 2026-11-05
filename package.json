@@ -1,40 +1,44 @@
 {
   "name": "uniway",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "predev": "node scripts/prepare-ocr.mjs",
+    "build": "tsc -b && vite build",
+    "test": "vitest run",
     "check": "tsc --noEmit",
-    "test": "node --test tests/*.test.mjs",
-    "test:ocr": "node scripts/test-ocr.mjs",
-    "prebuild": "node scripts/prepare-ocr.mjs",
-    "build": "vite build",
+    "test:watch": "vitest",
+    "engine:check": "node scripts/check-local-ocr.mjs",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"scripts/*.mjs\" \"docs/**/*.md\" \"*.{md,json,ts}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"scripts/*.mjs\" \"docs/**/*.md\" \"*.{md,json,ts}\"",
     "preview": "vite preview --host 127.0.0.1",
-    "format": "prettier --write src tests scripts docs .github *.md *.json *.ts",
-    "format:check": "prettier --check src tests scripts docs .github *.md *.json *.ts"
-  },
-  "dependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "tesseract.js": "7.0.0",
-    "@tesseract.js-data/eng": "1.0.0"
-  },
-  "devDependencies": {
-    "vite": "^6.0.0",
-    "typescript": "^5.7.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "prettier": "3.6.2"
-  },
-  "license": "MIT",
-  "description": "Turn campus layouts into private, interactive wayfinding maps.",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/MI1000-67/uniway.git"
+    "engine:setup": "node scripts/setup-local-ocr.mjs"
   },
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=22.12.0"
+  },
+  "dependencies": {
+    "@fontsource-variable/dm-sans": "^5.2.0",
+    "@fontsource-variable/manrope": "^5.2.0",
+    "jsqr": "^1.4.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tesseract.js": "^6.0.1"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^4.4.0",
+    "jsdom": "^27.0.0",
+    "playwright": "^1.62.1",
+    "prettier": "^3.6.0",
+    "qrcode": "^1.5.4",
+    "sharp": "^0.35.5",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.0",
+    "vitest": "^5.0.5"
   }
 }

@@ -1,0 +1,86 @@
+:root {
+  --route-shortest: #237c68;
+  --route-alternative-one: #b97928;
+  --route-alternative-two: #bd6755;
+}
+
+:root[data-theme="night"] {
+  --route-shortest: #80d7b5;
+  --route-alternative-one: #e6b25d;
+  --route-alternative-two: #ed9c87;
+}
+
+.route-choices {
+  margin: 18px 0;
+}
+
+.route-choices-list {
+  display: grid;
+  gap: 7px;
+}
+
+.route-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 60px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--cream);
+  text-align: left;
+}
+
+.route-choice:hover {
+  background: var(--soft);
+}
+
+.route-choice.is-selected {
+  border-color: var(--choice-color);
+  background: color-mix(in srgb, var(--choice-color) 9%, var(--cream));
+  box-shadow: inset 0 0 0 1px var(--choice-color);
+}
+
+.route-choice-swatch {
+  color: var(--choice-color);
+}
+
+.route-choice-copy {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+}
+
+.route-choice-copy strong {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.route-choice-copy > span,
+.route-choice-pattern {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.route-choice-pattern {
+  flex: none;
+  font-weight: 600;
+}
+
+.route-choices-note {
+  margin-top: 9px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+@media (forced-colors: active) {
+  .route-choice.is-selected {
+    outline: 2px solid Highlight;
+    outline-offset: -3px;
+  }
+}

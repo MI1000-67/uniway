@@ -1,40 +1,17 @@
-# Verification and device checklist
+# Reproducible checks
 
-Automated checks:
+`npm test` discovers only `src/**/*.test.ts` and `.tsx`; `.local` snapshots cannot inflate counts. `npm run check` checks TypeScript, `npm run engine:check` verifies local OCR bytes without network access, and `npm run build` checks the production bundle. CI runs these on a clean dependency install.
 
-```bash
-npm ci
-npm run check
-npm test
-npm run build
-npm run test:ocr
-npm run format:check
+For browser checks, start `npm run preview -- --port 5173` after building. The scripts use installed Microsoft Edge and write ignored reports to `test-results/`:
+
+```sh
+node scripts/appearance-review.mjs
+node scripts/browser-smoke.mjs "path/to/Science-Faculty-Map-01-scaled-1-1536x1087.jpg"
+node scripts/browser-faint.mjs "path/to/faint-floor-plan.png"
 ```
 
-The unit suite checks routing, alternatives, step-free filtering, reverse polyline geometry, import validation, candidate confirmation, synthetic road detection, blank layouts, label placement, search and timestamp expiry. The OCR smoke test reads a synthetic English PNG using the installed local model. It is not a representative campus accuracy benchmark.
+The two real-map fixtures belong to the user and are not included in the repository. CI uses synthetic pixels and OCR observations instead. A private fixture check is evidence for that image only, never a general accuracy benchmark. Browser reports include external request and page-error checks. Keep screenshots and source maps out of pull requests unless sharing is authorized.
 
-## Browser and phone checks still required
+Regression priorities: no outputs selected by filenames; no room-center routes through walls; no fabricated names from blank pixels; ambiguous colors and duplicate keys preserved for correction; coordinate scaling; cancelling analysis; review invalidation after movement; Unicode search; QR expiry; and mobile panel accessibility.
 
-Run these on Android Chrome and iPhone Safari, recording device, OS, browser version and result. Also test desktop keyboard use, screen-reader dialog names and zoom to 200%.
-
-| Journey                                               | Expected result                                                             |
-| ----------------------------------------------------- | --------------------------------------------------------------------------- |
-| Day/night toggle in map header and session            | Readable text and categories; scene switch works; reduced motion is instant |
-| Small screen and landscape                            | Map, search, route controls and dialogs remain reachable                    |
-| Drag, pinch, rotate, keyboard and compass             | Geometry stays aligned; compass resets; imported map makes no north claim   |
-| Two route alternatives                                | Distances remain ranked; selected route and written steps agree             |
-| Upload portrait/landscape and multiple images         | Source and generated overlays align; floors stay separate                   |
-| Remove a false path, review, request directions       | Only the remaining confirmed graph is used                                  |
-| No labels / no roads / disconnected graph             | Honest empty state; no fabricated route                                     |
-| Cancel import; close scanner while camera grant waits | Work stops; no late stream remains active                                   |
-| Camera denied or BarcodeDetector missing              | Clear fallback link entry                                                   |
-| End session during import                             | No imported map returns after cleanup                                       |
-| Resume after three hours                              | Expired data cleared before exploration resumes                             |
-| Storage disabled/full                                 | Honest message; current tab remains usable                                  |
-| Fresh clone and static HTTPS deployment               | OCR assets load from same host; no API key needed                           |
-
-Real-campus acceptance also requires field checks of entrances, closures, direction permissions and step-free evidence. The earlier survey workbook has separate validation findings and is not bundled or certified by this app release.
-
-## Small layouts with a colour legend
-
-Reimport the image to use the new reading pass. Check that the original drawing stays visible and that suggested numbered pins align with the correct buildings. Repeated colours should leave labels waiting for placement. Place one, cancel another, change floors and reload the session to verify the queue stays correct. Move a pin and confirm its paths require review again. Trace a walkway around two bends, undo one bend, finish at another pin and verify the route follows the traced geometry. Repeat with keyboard entry and touch. This browser/device checklist has not yet been completed for 0.3.0.
+If `engine:check` reports missing assets, run `npm run engine:setup`. It reuses verified files, checks downloads against pinned hashes, and does not start an AI service. For unreadable photographs, verify that a quiet quality note and manual editing remain available. Phone camera, orientation sensors and language accuracy need representative physical-device testing beyond simulated unit tests.

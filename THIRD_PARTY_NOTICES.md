@@ -1,14 +1,7 @@
 # Third-party notices
 
-UniWay's MIT license applies to its application code. It does not replace dependency or font licenses.
+`src/engine/imported/` adapts palette segmentation, connected components, generic directory matching and room-region detection from the supplied `anti unieway/uniway-date-publish` project. Copyright (c) 2026 UniWay contributors. The complete MIT license is retained in [src/engine/imported/LICENSE](src/engine/imported/LICENSE). `src/search.ts` adapts that project's search approach with Unicode-preserving normalization, deterministic ranking and constrained typo handling under the same notice.
 
-| Material                   | Origin                     | License / notice                                                                                    |
-| -------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------- |
-| Inter fonts                | Inter Project Authors      | `public/fonts/inter-OFL.txt` (SIL OFL 1.1)                                                          |
-| Newsreader fonts           | Newsreader Project Authors | `public/fonts/newsreader-OFL.txt` (SIL OFL 1.1)                                                     |
-| React / React DOM          | Meta and contributors      | MIT; packaged dependency license                                                                    |
-| Tesseract.js and core      | Tesseract.js contributors  | Apache-2.0; packaged dependency notices                                                             |
-| English trained data       | `@tesseract.js-data/eng`   | Preserve installed package/model notices; MIT package metadata; upstream trained-data notices apply |
-| Vite, TypeScript, Prettier | Their respective projects  | Preserve packaged license files                                                                     |
+Tesseract.js and Tesseract.js-core retain their installed licenses. Language data comes from `tesseract-ocr/tessdata_fast`, release 4.1.0, under Apache 2.0. Setup copies their notices into `public/ocr/` and records the language provenance and SHA-256 values. `scripts/ocr-assets.json` records the expected values used by the offline checker.
 
-`npm ci` retrieves dependencies according to the lockfile. `scripts/prepare-ocr.mjs` copies local OCR runtime/model assets into the build. Builds include runtime licenses and model package metadata under `ocr/licenses/`. Redistributors should retain their installed package license notices when shipping those assets. The campus illustration and OCR fixture in this repo are synthetic; no real university layout is included.
+DM Sans and Manrope are bundled through their Fontsource packages; preserve their SIL Open Font License notices when distributing assets. Other packages retain their own licenses in the installed dependency tree. This file scopes imported material and does not make a project-wide license grant.

@@ -1,0 +1,267 @@
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
+import App from "../App";
+import ConnectView from "./ConnectView";
+
+beforeEach(() => {
+  sessionStorage.clear();
+  HTMLDialogElement.prototype.showModal = vi.fn(function (
+    this: HTMLDialogElement,
+  ) {
+    this.setAttribute("open", "");
+  });
+  HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) {
+    this.removeAttribute("open");
+  });
+  Element.prototype.scrollTo = vi.fn();
+});
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
+
+describe("UniWay Connect (Module B) - Seller & Volunteer Management", () => {
+  it("renders the hero banner with approved tagline", () => {
+    render(
+      <ConnectView
+        onNavigateToLocation={vi.fn()}
+        onSwitchToNavigate={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText("Find your way. Find your community."),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/UniWay Connect · Smart Campus Ecosystem/i),
+    ).toBeTruthy();
+  });
+
+  it("renders Common and Volunteer primary navigation tabs", () => {
+    render(
+      <ConnectView
+        onNavigateToLocation={vi.fn()}
+        onSwitchToNavigate={vi.fn()}
+      />,
+    );
+
+    const commonTab = screen.getByRole("button", { name: /Common/i });
+    const volunteerTab = screen.getByRole("button", { name: /Volunteer/i });
+
+    expect(commonTab.className).toContain("active");
+    expect(volunteerTab.className).not.toContain("active");
+  });
+
+  it("allows a seller to open '+ List an Item' modal and publish a new item", () => {
+    render(
+      <ConnectView
+        onNavigateToLocation={vi.fn()}
+        onSwitchToNavigate={vi.fn()}
+      />,
+    );
+
+    const listBtn = screen.getByRole("button", { name: /List an Item/i });
+    fireEvent.click(listBtn);
+
+    expect(
+      screen.getByRole("heading", { name: "Create Campus Listing" }),
+    ).toBeTruthy();
+
+    const titleInput = screen.getByLabelText(/Item Title \*/i);
+    fireEvent.change(titleInput, {
+      target: { value: "Data Structures & Algorithms Course Notes" },
+    });
+
+    const sellerInput = screen.getByLabelText(/Seller Name \*/i);
+    fireEvent.change(sellerInput, {
+      target: { value: "Malik R." },
+    });
+
+    const contactInput = screen.getByLabelText(/Contact Email or Phone \*/i);
+    fireEvent.change(contactInput, {
+      target: { value: "malik.r@campus.uniway.edu" },
+    });
+
+    const submitBtn = screen.getByRole("button", {
+      name: /Publish Listing/i,
+    });
+    fireEvent.submit(submitBtn.closest("form")!);
+
+    // Modal closed and item rendered in feed
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(
+      screen.getByText("Data Structures & Algorithms Course Notes"),
+    ).toBeTruthy();
+  });
+
+  it("allows an organizer to open '+ Post Opportunity' modal and publish a role", () => {
+    render(
+      <ConnectView
+        onNavigateToLocation={vi.fn()}
+        onSwitchToNavigate={vi.fn()}
+      />,
+    );
+
+    // Switch to volunteer tab
+    const volunteerTab = screen.getByRole("button", { name: /Volunteer/i });
+    fireEvent.click(volunteerTab);
+
+    const postVolBtn = screen.getByRole("button", {
+      name: /Post Opportunity/i,
+    });
+    fireEvent.click(postVolBtn);
+
+    expect(
+      screen.getByRole("heading", { name: "Recruit Campus Volunteers" }),
+    ).toBeTruthy();
+
+    const titleInput = screen.getByLabelText(/Opportunity Title \*/i);
+    fireEvent.change(titleInput, {
+      target: { value: "Campus Solar Panel Cleaning Drive" },
+    });
+
+    const orgInput = screen.getByLabelText(/Hosting Student Club \*/i);
+    fireEvent.change(orgInput, {
+      target: { value: "Clean Energy Society" },
+    });
+
+    const submitBtn = screen.getByRole("button", {
+      name: /Publish Opportunity/i,
+    });
+    fireEvent.submit(submitBtn.closest("form")!);
+
+    // Modal closed and opportunity rendered
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByText("Campus Solar Panel Cleaning Drive")).toBeTruthy();
+    expect(screen.getByText("Clean Energy Society")).toBeTruthy();
+  });
+
+  it("allows seller to toggle Seller Controls and mark an item as Sold", () => {
+    render(
+      <ConnectView
+        onNavigateToLocation={vi.fn()}
+        onSwitchToNavigate={vi.fn()}
+      />,
+    );
+
+    const manageBtn = screen.getByRole("button", {
+      name: /Seller Controls/i,
+    });
+    fireEvent.click(manageBtn);
+
+    expect(screen.getByText(/Seller Dashboard Active/i)).toBeTruthy();
+
+    // Click "Sold" on the first listing
+    const soldBtns = screen.getAllByRole("button", { name: "Sold" });
+    fireEvent.click(soldBtns[0]);
+
+    // Check that chip text updates to "sold"
+    expect(screen.getByText("sold")).toBeTruthy();
+  });
+
+  it("allows organizer to toggle recruitment between OPEN and CLOSED", () => {
+    render(
+      <ConnectView
+        onNavigateToLocation={vi.fn()}
+        onSwitchToNavigate={vi.fn()}
+      />,
+    );
+
+    const volunteerTab = screen.getByRole("button", { name: /Volunteer/i });
+    fireEvent.click(volunteerTab);
+
+    const manageBtn = screen.getByRole("button", {
+      name: /Organizer Controls/i,
+    });
+    fireEvent.click(manageBtn);
+
+    expect(screen.getByText(/Volunteer Coordinator Dashboard/i)).toBeTruthy();
+
+    // Click status toggle button
+    const openStatusBtn = screen.getAllByRole("button", {
+      name: "Status: OPEN",
+    })[0];
+    fireEvent.click(openStatusBtn);
+
+    expect(screen.getByText("Status: CLOSED")).toBeTruthy();
+  });
+
+  it("triggers cross-module navigation callback with verified location details", () => {
+    const handleNavigate = vi.fn();
+    render(
+      <ConnectView
+        onNavigateToLocation={handleNavigate}
+        onSwitchToNavigate={vi.fn()}
+      />,
+    );
+
+    const navigateBtns = screen.getAllByRole("button", { name: /Navigate/i });
+    expect(navigateBtns.length).toBeGreaterThan(0);
+
+    fireEvent.click(navigateBtns[0]);
+
+    expect(handleNavigate).toHaveBeenCalledWith(
+      "science",
+      "School of Science — Ground Floor Foyer",
+    );
+  });
+
+  it("allows voting in the campus interest poll and shows updated state", () => {
+    render(
+      <ConnectView
+        onNavigateToLocation={vi.fn()}
+        onSwitchToNavigate={vi.fn()}
+      />,
+    );
+
+    const pollQuestion = screen.getByText(
+      /Should the Student Council establish a weekly Tuesday pop-up market/i,
+    );
+    expect(pollQuestion).toBeTruthy();
+
+    const yesOption = screen.getByText(/Yes, definitely! Would visit weekly/i);
+    fireEvent.click(yesOption);
+
+    expect(screen.getByText(/✓ \(Your vote\)/i)).toBeTruthy();
+  });
+
+  it("allows seamless navigation switching in App header", () => {
+    render(<App />);
+
+    // Initially in Navigate view with campus map
+    expect(screen.getByRole("region", { name: "Campus map" })).toBeTruthy();
+
+    // Click "UniWay Connect" in the header switcher
+    const connectNavBtn = screen.getByRole("button", {
+      name: /UniWay Connect/i,
+    });
+    fireEvent.click(connectNavBtn);
+
+    // Verify Connect view is displayed
+    expect(
+      screen.getByRole("heading", {
+        name: "Find your way. Find your community.",
+      }),
+    ).toBeTruthy();
+
+    // Click "Navigate" in the header switcher to return
+    const navSwitcher = screen.getByRole("navigation", {
+      name: "Main module switcher",
+    });
+    const navigateNavBtn = within(navSwitcher).getByRole("button", {
+      name: /Navigate/i,
+    });
+    fireEvent.click(navigateNavBtn);
+
+    // Campus map is back
+    expect(screen.getByRole("region", { name: "Campus map" })).toBeTruthy();
+  });
+});
