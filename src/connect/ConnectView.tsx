@@ -1,3 +1,5 @@
+import { campusLocations, demoLocation } from "../locations";
+import type { LocationReference } from "../locations";
 import React, { useMemo, useState } from "react";
 import {
   ArrowRight,
@@ -39,19 +41,12 @@ import {
 import "./connect.css";
 
 interface ConnectViewProps {
-  onNavigateToLocation: (placeId?: string, locationName?: string) => void;
+  onNavigateToLocation: (
+    location?: LocationReference,
+    locationName?: string,
+  ) => void;
   onSwitchToNavigate: () => void;
 }
-
-const campusLocations = [
-  { id: "science", name: "School of Science — Ground Floor Foyer" },
-  { id: "library", name: "The Central Library — Study Commons" },
-  { id: "cafe", name: "Common Ground Café — North Patio" },
-  { id: "engineering", name: "Engineering Building — Makerspace" },
-  { id: "student-centre", name: "Student Centre — Atrium" },
-  { id: "sports", name: "University Sports Ground — Pavilion" },
-  { id: "arts", name: "Faculty of Arts — Quad" },
-];
 
 export default function ConnectView({
   onNavigateToLocation,
@@ -191,7 +186,7 @@ export default function ConnectView({
       condition: newPostCondition,
       sellerName: newPostSellerName.trim() || "Student Seller",
       sellerContact: newPostSellerContact.trim() || "student@campus.uniway.edu",
-      placeId: newPostPlaceId,
+      location: demoLocation(newPostPlaceId),
       locationName: locName,
       pickupWindow: newPostPickupWindow.trim() || "By appointment",
       status: "available",
@@ -229,7 +224,7 @@ export default function ConnectView({
       spotsTotal: parseInt(newVolSpots, 10) || 5,
       spotsFilled: 0,
       eventDate: newVolDate.trim() || "Upcoming Weekend",
-      placeId: newVolPlaceId,
+      location: demoLocation(newVolPlaceId),
       locationName: locName,
       requirements: reqList.length > 0 ? reqList : ["All students welcome"],
       status: "open",
@@ -315,14 +310,15 @@ export default function ConnectView({
       {/* Hero Section */}
       <section className="connect-hero">
         <span className="connect-hero-eyebrow">
-          <Sparkles size={14} /> UniWay Connect · Smart Campus Ecosystem
+          <Sparkles size={14} /> UniWay Connect · Interactive demo
         </span>
         <h1 className="connect-hero-title">
           Find your way. Find your community.
         </h1>
         <p className="connect-hero-subtitle">
-          Connect directly with fellow students, local bakes, course supplies,
-          academic hackathons, and community greening initiatives across campus.
+          Explore sample campus listings, polls, and volunteering. Changes stay
+          in this demo until you leave Connect or reload. No messages or
+          applications are sent.
         </p>
       </section>
 
@@ -505,7 +501,7 @@ export default function ConnectView({
                   <Vote size={13} /> Campus Interest Poll
                 </span>
                 <small style={{ color: "var(--muted)" }}>
-                  {polls[0].totalVotes} student responses
+                  {polls[0].totalVotes} demo responses
                 </small>
               </div>
               <h2 className="poll-question">{polls[0].question}</h2>
@@ -663,7 +659,7 @@ export default function ConnectView({
                       type="button"
                       className="btn-navigate-to-location"
                       onClick={() =>
-                        onNavigateToLocation(post.placeId, post.locationName)
+                        onNavigateToLocation(post.location, post.locationName)
                       }
                       title="Open turn-by-turn route to seller"
                     >
@@ -879,7 +875,7 @@ export default function ConnectView({
                       type="button"
                       className="btn-navigate-to-location"
                       onClick={() =>
-                        onNavigateToLocation(opp.placeId, opp.locationName)
+                        onNavigateToLocation(opp.location, opp.locationName)
                       }
                       title="Open turn-by-turn route to volunteer venue"
                     >
@@ -1390,7 +1386,7 @@ export default function ConnectView({
                 className="btn-navigate-to-location"
                 style={{ height: 44 }}
                 onClick={() => {
-                  const pid = selectedPost.placeId;
+                  const pid = selectedPost.location;
                   const loc = selectedPost.locationName;
                   setSelectedPost(null);
                   onNavigateToLocation(pid, loc);
@@ -1438,10 +1434,12 @@ export default function ConnectView({
                 }}
               >
                 <CheckCircle2 size={48} style={{ color: "#058c42" }} />
-                <h3 style={{ margin: 0, fontSize: 20 }}>Interest Expressed!</h3>
+                <h3 style={{ margin: 0, fontSize: 20 }}>
+                  Demo interest recorded
+                </h3>
                 <p style={{ margin: 0, fontSize: 14, color: "var(--muted)" }}>
-                  Thank you! The coordinator from {applyingVol.organization} has
-                  been notified.
+                  Your interest is shown in this demo only. No application was
+                  sent to {applyingVol.organization}.
                 </p>
               </div>
             ) : (

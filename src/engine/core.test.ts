@@ -1,3 +1,4 @@
+import { detectedEdge } from "../mapEdges";
 import { describe, expect, it } from "vitest";
 import {
   assessQuality,
@@ -12,6 +13,7 @@ import {
 } from "./core";
 import type { PixelImage, OCRLine } from "./types";
 import { findRouteAlternatives } from "../routeAlternatives";
+import { detectWalls } from "./imported/floorplan";
 
 function image(width = 200, height = 200): PixelImage {
   return {
@@ -90,7 +92,9 @@ describe("local extraction boundaries", () => {
       1000,
       1000,
     );
-    expect(graph.edges).toEqual([{ from: "a", to: "b", stepFree: false }]);
+    expect(graph.edges).toEqual([
+      detectedEdge({ from: "a", to: "b", stepFree: false }),
+    ]);
     expect(
       findRouteAlternatives(
         "a",
@@ -190,6 +194,63 @@ describe("local extraction boundaries", () => {
     expect(hasLineOfSight(20, 50, 80, 50, wallMask, 100, 100)).toBe(false);
     // Path on same side of wall from (20, 20) to (20, 80) must pass
     expect(hasLineOfSight(20, 20, 20, 80, wallMask, 100, 100)).toBe(true);
+    expect(hasLineOfSight(-1, 20, 20, 20, wallMask, 100, 100)).toBe(false);
+    expect(hasLineOfSight(NaN, 20, 20, 20, wallMask, 100, 100)).toBe(false);
+  });
+
+  it.each([false, true])(
+    "retains doorway connectivity only when an opening exists: %s",
+    (door) => {
+      const pixels = image(240, 180);
+      const wall = (x: number, y: number, w: number, h: number) => {
+        for (let yy = y; yy < y + h; yy++)
+          for (let xx = x; xx < x + w; xx++)
+            pixels.data.set([20, 20, 20, 255], (yy * 240 + xx) * 4);
+      };
+      wall(10, 10, 220, 4);
+      wall(10, 166, 220, 4);
+      wall(10, 10, 4, 160);
+      wall(226, 10, 4, 160);
+      wall(118, 10, 4, door ? 65 : 160);
+      if (door) wall(118, 105, 4, 65);
+      const graph = extractIndoorLinework(pixels, [
+        { x: 30, y: 70, width: 40, height: 40 },
+        { x: 170, y: 70, width: 40, height: 40 },
+      ]);
+      const walls = detectWalls(pixels);
+      for (const edge of graph.edges) {
+        const a = graph.nodes.find((n) => n.id === edge.from)!;
+        const b = graph.nodes.find((n) => n.id === edge.to)!;
+        expect(hasLineOfSight(a.x, a.y, b.x, b.y, walls, 240, 180)).toBe(true);
+        expect(edge.stepFree).toBe(false);
+      }
+      const routes = findRouteAlternatives(
+        "room-node-0",
+        "room-node-1",
+        false,
+        graph.nodes,
+        graph.edges,
+      );
+      expect(routes.length > 0).toBe(door);
+    },
+  );
+
+  it("does not attach an indoor label to a nearby path across a wall", () => {
+    const walls = new Uint8Array(200 * 200);
+    for (let y = 0; y < 200; y++) walls[y * 200 + 100] = 1;
+    const graph = attachPlaces(
+      [{ text: "Lab", x: 90, y: 100, confidence: 95, source: "label" }],
+      {
+        nodes: [{ id: "corridor", x: 110, y: 100, landmark: "Corridor" }],
+        edges: [],
+      },
+      200,
+      200,
+      (label, node) =>
+        hasLineOfSight(label.x, label.y, node.x, node.y, walls, 200, 200),
+    );
+    expect(graph.places[0].nodeId).not.toBe("corridor");
+    expect(graph.edges).toEqual([]);
   });
 
   it("extracts indoor corridor linework without crossing walls", () => {

@@ -11,6 +11,7 @@ import {
   Plus,
 } from "lucide-react";
 import { loadImage, validateImage } from "./uploads";
+import { convertHeicToJpegBlob, isHeicFile } from "./heicConverter";
 import type { PreparedMap } from "./preparedMap";
 import MapPreparation from "./MapPreparation";
 export type UploadedImage = {
@@ -65,7 +66,18 @@ export default function UploadPanel({
         errors.push(`${file.name}: ${invalid}`);
         continue;
       }
-      const url = URL.createObjectURL(file);
+      let sourceBlob: Blob = file;
+      if (isHeicFile(file)) {
+        try {
+          sourceBlob = await convertHeicToJpegBlob(file);
+        } catch (err) {
+          errors.push(
+            `${file.name}: ${err instanceof Error ? err.message : "This image could not be read."}`,
+          );
+          continue;
+        }
+      }
+      const url = URL.createObjectURL(sourceBlob);
       try {
         const image = await loadImage(url);
         valid.push({
@@ -102,7 +114,7 @@ export default function UploadPanel({
         ref={input}
         className="sr-only"
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept=".heic,.heif,image/jpeg,image/png,image/webp,image/heic,image/heif"
         multiple
         aria-label="Choose campus map images"
         onChange={(e) => void addFiles(e.target.files)}
@@ -131,7 +143,7 @@ export default function UploadPanel({
         <span>
           or <u>browse files</u> on your device
         </span>
-        <small>JPG, PNG, or WebP · Up to 15 MB each</small>
+        <small>JPG, PNG, WebP, or HEIC · Up to 15 MB each</small>
       </button>
       {error && (
         <p className="error-message" role="alert">

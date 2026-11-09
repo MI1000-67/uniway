@@ -1,5 +1,6 @@
 import type { PathEdge, PathNode, Category } from "../campus";
 import type { MapPlace } from "../preparedMap";
+import { detectedEdge } from "../mapEdges";
 import type { Crop, DetectedLabel, OCRLine, PixelImage } from "./types";
 import { detectWalls } from "./imported/floorplan";
 
@@ -855,7 +856,7 @@ export function skeletonToGraph(
   return simplifyLinework(nodes, edges);
 }
 
-/** Check line of sight across a wall mask. Returns false if any wall pixel is crossed. */
+/** Check line of sight across a wall mask; out-of-bounds points are not evidence. */
 export function hasLineOfSight(
   x0: number,
   y0: number,
@@ -866,6 +867,14 @@ export function hasLineOfSight(
   height: number,
   clearance = 0,
 ): boolean {
+  if (
+    ![x0, y0, x1, y1].every(Number.isFinite) ||
+    Math.min(x0, x1) < 0 ||
+    Math.min(y0, y1) < 0 ||
+    Math.max(x0, x1) > width - 1 ||
+    Math.max(y0, y1) > height - 1
+  )
+    return false;
   const ix0 = Math.round(x0),
     iy0 = Math.round(y0);
   const ix1 = Math.round(x1),
@@ -981,7 +990,7 @@ export function extractIndoorLinework(
           Math.hypot(a.x - b.x, a.y - b.y) < Math.max(w, h) * 0.45 &&
           hasLineOfSight(a.x, a.y, b.x, b.y, wallMask, w, h)
         ) {
-          edges.push({ from: a.id, to: b.id, stepFree: true });
+          edges.push({ from: a.id, to: b.id, stepFree: false });
         }
       }
     }
@@ -1005,13 +1014,26 @@ export function extractIndoorLinework(
     }
     if (bestNode) {
       const roomId = `room-node-${r}`;
-      nodes.push({ id: roomId, x: rx, y: ry, landmark: "room entrance" });
-      edges.push({ from: roomId, to: bestNode.id, stepFree: true });
+      nodes.push({
+        id: roomId,
+        x: rx,
+        y: ry,
+        landmark: "room approach to review",
+      });
+      edges.push({ from: roomId, to: bestNode.id, stepFree: false });
     }
   }
 
   const coverage = corridorPixelCount / Math.max(1, w * h);
-  return { ...simplifyLinework(nodes, edges), mask: corridorMask, coverage };
+  const simplified = simplifyLinework(nodes, edges);
+  const lookup = new Map(simplified.nodes.map((n) => [n.id, n]));
+  // Simplifying bends must not introduce a chord through a wall.
+  simplified.edges = simplified.edges.filter((e) => {
+    const a = lookup.get(e.from)!,
+      b = lookup.get(e.to)!;
+    return hasLineOfSight(a.x, a.y, b.x, b.y, wallMask, w, h);
+  });
+  return { ...simplified, mask: corridorMask, coverage };
 }
 
 /** Reduce sampled lines to their junctions and bends, within 0.7 source pixels. */
@@ -1125,6 +1147,7 @@ export function attachPlaces(
   path: Pick<Linework, "nodes" | "edges">,
   width: number,
   height: number,
+  canApproach?: (label: DetectedLabel, node: PathNode) => boolean,
 ) {
   const nodes = path.nodes.map((n) => ({ ...n })),
     places: MapPlace[] = [],
@@ -1132,23 +1155,12 @@ export function attachPlaces(
   for (const label of labels) {
     let nearest: PathNode | undefined,
       dist = Infinity;
-    const exactNode = nodes.find(
-      (n) =>
-        !used.has(n.id) &&
-        (n.landmark === label.text ||
-          (label.number && n.id === `f0-p${Number(label.number) - 1}`)),
-    );
-    if (exactNode) {
-      nearest = exactNode;
-      dist = 0;
-    } else {
-      for (const n of nodes) {
-        if (used.has(n.id)) continue;
-        const d = Math.hypot(n.x - label.x, n.y - label.y);
-        if (d < dist) {
-          nearest = n;
-          dist = d;
-        }
+    for (const n of nodes) {
+      if (used.has(n.id) || (canApproach && !canApproach(label, n))) continue;
+      const d = Math.hypot(n.x - label.x, n.y - label.y);
+      if (d < dist) {
+        nearest = n;
+        dist = d;
       }
     }
     // Approach points live ON visible linework. No geometric connector is
@@ -1185,7 +1197,7 @@ export function attachPlaces(
       approachEstimated: path.nodes.some((n) => n.id === nearest!.id),
     });
   }
-  return { nodes, edges: path.edges, places };
+  return { nodes, edges: path.edges.map(detectedEdge), places };
 }
 
 export function assessQuality(image: PixelImage, labels: DetectedLabel[]) {

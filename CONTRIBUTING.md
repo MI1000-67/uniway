@@ -24,4 +24,4 @@ Use `npm run test:watch` while developing. Use `npm run format` to format TypeSc
 
 Keep a change focused and explain the user-visible behavior, test evidence and remaining limitations. Extraction changes should add a synthetic failure case, including a negative example that must not produce a route. Do not submit private campus photos, access credentials or copyrighted fixtures without permission. Generated OCR assets, dependencies, local snapshots and browser reports are ignored.
 
-Retain the imported engine's MIT copyright notice. The main project's owner should choose a project-wide license before a public release; the imported modules' notice does not license unrelated files. This workspace is prepared for contribution but has not been pushed or deployed by this migration.
+The main project is licensed under the root MIT `LICENSE`. Retain the imported engine's separate MIT copyright notice and third-party asset licenses. Do not include private map fixtures in contributions. This correction phase does not push or deploy the project.

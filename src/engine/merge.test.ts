@@ -21,6 +21,27 @@ const label = (x: number, number = "1"): DetectedLabel => ({
 });
 
 describe("integrated extraction evidence", () => {
+  it.each([9, 10, 20])(
+    "keeps conflicts unresolved with %i layout labels",
+    (count) => {
+      const candidates = Array.from({ length: count }, (_, i) => ({
+        ...label(600, String(i + 1)),
+        text: i === 0 ? "Library" : `Building ${i}`,
+      }));
+      const result = mergeDetections(
+        [{ ...label(200), confidence: 99 }],
+        layout(candidates),
+        1000,
+        700,
+      );
+      expect(result.labels.some((l) => l.text === "Library")).toBe(false);
+      expect(result.unresolved).toContainEqual({
+        text: "Library",
+        confidence: 90,
+        reason: "ambiguous-key",
+      });
+    },
+  );
   it("recovers a missing marker using targeted number OCR without duplicating a place", () => {
     const candidate = layout();
     candidate.unresolvedLabels = [

@@ -17,6 +17,8 @@ import {
   moveMapNode,
   removeMapNode,
   reviewMap,
+  reviewConnection,
+  publishMap,
 } from "./preparedMap";
 import type { PreparedMap } from "./preparedMap";
 import ImageMapCanvas from "./ImageMapCanvas";
@@ -323,8 +325,9 @@ export default function MapEditor({
                 <Check size={16} /> Finish this path
               </button>
               <p className="small-copy">
-                Join paths at the same numbered point. Crossing lines alone do
-                not create a junction.
+                Draw only paths you have checked for pedestrian access. Join
+                paths at the same numbered point. Crossing lines alone do not
+                create a junction.
               </p>
             </div>
           )}
@@ -472,7 +475,7 @@ export default function MapEditor({
           )}
           {active &&
             map.edges.some((e) => e.from === active || e.to === active) && (
-              <details className="editor-tool-options">
+              <details className="editor-tool-options" open>
                 <summary>Connected paths</summary>
                 <div className="editor-point-list">
                   {map.edges
@@ -483,19 +486,66 @@ export default function MapEditor({
                           n.id === (edge.from === active ? edge.to : edge.from),
                       );
                       return (
-                        <button
-                          key={`${edge.from}:${edge.to}`}
-                          aria-label={`Remove path to ${other?.landmark ?? "point"}`}
-                          onClick={() =>
-                            change({
-                              ...map,
-                              edges: map.edges.filter((e) => e !== edge),
-                            })
-                          }
-                        >
-                          <Trash2 size={15} /> Remove path to{" "}
-                          {other?.landmark ?? "point"}
-                        </button>
+                        <div key={`${edge.from}:${edge.to}`}>
+                          <p className="small-copy">
+                            {edge.origin === "detected"
+                              ? "Detected path"
+                              : "Manually traced path"}
+                            {edge.review.pedestrian
+                              ? " · walking access checked"
+                              : " · review needed"}
+                          </p>
+                          <label className="map-check">
+                            <input
+                              type="checkbox"
+                              checked={edge.review.pedestrian}
+                              onChange={(e) =>
+                                change(
+                                  reviewConnection(
+                                    map,
+                                    edge,
+                                    "pedestrian",
+                                    e.target.checked,
+                                  ),
+                                )
+                              }
+                            />
+                            Walkable path to {other?.landmark ?? "point"}
+                          </label>
+                          <label className="map-check">
+                            <input
+                              type="checkbox"
+                              checked={
+                                edge.stepFree && edge.review.accessibility
+                              }
+                              disabled={!edge.review.pedestrian}
+                              onChange={(e) =>
+                                change(
+                                  reviewConnection(
+                                    map,
+                                    edge,
+                                    "accessibility",
+                                    e.target.checked,
+                                  ),
+                                )
+                              }
+                            />
+                            Verified step-free path to{" "}
+                            {other?.landmark ?? "point"}
+                          </label>
+                          <button
+                            aria-label={`Remove path to ${other?.landmark ?? "point"}`}
+                            onClick={() =>
+                              change({
+                                ...map,
+                                edges: map.edges.filter((e) => e !== edge),
+                              })
+                            }
+                          >
+                            <Trash2 size={15} /> Remove path to{" "}
+                            {other?.landmark ?? "point"}
+                          </button>
+                        </div>
                       );
                     })}
                 </div>
@@ -549,6 +599,18 @@ export default function MapEditor({
       <div className="editor-review">
         <div>
           <h4>Ready to navigate?</h4>
+          {map.edges.some((edge) => !edge.review.pedestrian) && (
+            <button
+              className="secondary-button"
+              onClick={() => {
+                const edge = map.edges.find((e) => !e.review.pedestrian)!;
+                chooseTool("pan");
+                setActive(edge.from);
+              }}
+            >
+              Review next path
+            </button>
+          )}
           {!!issues.length && (
             <ul>
               {issues.map((issue) => (
@@ -580,14 +642,10 @@ export default function MapEditor({
         <button
           className="primary-button"
           disabled={!!issues.length || !namesValid || !reviewed}
-          onClick={() =>
-            onPublish({
-              ...map,
-              name: map.name.trim(),
-              places: map.places.map((p) => ({ ...p, name: p.name.trim() })),
-              published: true,
-            })
-          }
+          onClick={() => {
+            const ready = reviewed ? publishMap(map) : null;
+            if (ready) onPublish(ready);
+          }}
         >
           Open interactive map <ArrowRight size={17} />
         </button>

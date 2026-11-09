@@ -1,4 +1,6 @@
-import type { Category, PathEdge, PathNode, Point } from "./campus";
+import type { Category, PathNode, Point } from "./campus";
+import { canWalk, manualEdge } from "./mapEdges";
+import type { PreparedEdge } from "./mapEdges";
 import type { UploadedImage } from "./UploadPanel";
 import { findRoute } from "./routing";
 import { findRouteAlternatives } from "./routeAlternatives";
@@ -26,7 +28,7 @@ export type PreparedMap = {
   image: UploadedImage;
   name: string;
   nodes: PathNode[];
-  edges: PathEdge[];
+  edges: PreparedEdge[];
   places: MapPlace[];
   metersPerPixel: number | null;
   published: boolean;
@@ -53,18 +55,53 @@ export function newMap(image: UploadedImage): PreparedMap {
 }
 
 export function addConnection(
-  edges: PathEdge[],
+  edges: PreparedEdge[],
   from: string,
   to: string,
   stepFree: boolean,
-): PathEdge[] {
+): PreparedEdge[] {
   if (from === to) return edges;
   const existing = edges.find(
     (e) => (e.from === from && e.to === to) || (e.from === to && e.to === from),
   );
   return existing
-    ? edges.map((e) => (e === existing ? { ...e, stepFree } : e))
-    : [...edges, { from, to, stepFree }];
+    ? edges.map((e) =>
+        e === existing
+          ? { ...manualEdge(e.from, e.to, stepFree), origin: e.origin }
+          : e,
+      )
+    : [...edges, manualEdge(from, to, stepFree)];
+}
+
+/** Accessibility confirmation is separate from pedestrian access. */
+export function reviewConnection(
+  map: PreparedMap,
+  edge: PreparedEdge,
+  kind: "pedestrian" | "accessibility",
+  checked: boolean,
+): PreparedMap {
+  return {
+    ...map,
+    published: false,
+    edges: map.edges.map((e) => {
+      if (e !== edge) return e;
+      if (kind === "pedestrian")
+        return {
+          ...e,
+          stepFree: checked && e.stepFree,
+          review: {
+            pedestrian: checked,
+            accessibility: checked && e.review.accessibility,
+          },
+        };
+      if (!e.review.pedestrian) return e;
+      return {
+        ...e,
+        stepFree: checked,
+        review: { pedestrian: true, accessibility: true },
+      };
+    }),
+  };
 }
 
 export function removeMapNode(map: PreparedMap, id: string): PreparedMap {
@@ -103,7 +140,13 @@ export function moveMapNode(
         : p,
     ),
     edges: map.edges.map((e) =>
-      e.from === id || e.to === id ? { ...e, stepFree: false } : e,
+      e.from === id || e.to === id
+        ? {
+            ...e,
+            stepFree: false,
+            review: { pedestrian: false, accessibility: false },
+          }
+        : e,
     ),
   };
 }
@@ -117,6 +160,36 @@ export function reviewMap(map: PreparedMap): string[] {
     );
   if (!map.edges.length)
     problems.push("Trace a walking path between your places.");
+  const ids = new Set(map.nodes.map((n) => n.id));
+  if (
+    ids.size !== map.nodes.length ||
+    map.nodes.some(
+      (n) =>
+        ![n.x, n.y].every(Number.isFinite) ||
+        n.x < 0 ||
+        n.y < 0 ||
+        n.x > map.image.width ||
+        n.y > map.image.height,
+    ) ||
+    map.places.some((p) => !ids.has(p.nodeId)) ||
+    map.edges.some((e) => e.from === e.to || !ids.has(e.from) || !ids.has(e.to))
+  )
+    problems.push("Check the map points and path endpoints before navigation.");
+  if (
+    map.places.some((p) => !p.name.trim()) ||
+    new Set(map.places.map((p) => p.name.trim().toLowerCase())).size !==
+      map.places.length
+  )
+    problems.push("Give every place a unique, non-empty name.");
+  const unreviewed = map.edges.filter((e) => !canWalk(e)).length;
+  if (unreviewed)
+    problems.push(
+      `Review pedestrian access for ${unreviewed} path segment${unreviewed === 1 ? "" : "s"}. Select a map point to review its connections.`,
+    );
+  if (map.edges.some((e) => e.stepFree && !e.review?.accessibility))
+    problems.push(
+      "Confirm accessibility separately for paths marked step-free.",
+    );
   const first = map.places[0];
   if (first && map.places.length > 1 && map.edges.length) {
     const connected = new Set([first.nodeId]);
@@ -124,6 +197,7 @@ export function reviewMap(map: PreparedMap): string[] {
       map.nodes.map((node) => [node.id, [] as string[]]),
     );
     for (const edge of map.edges) {
+      if (!canWalk(edge)) continue;
       neighbors.get(edge.from)?.push(edge.to);
       neighbors.get(edge.to)?.push(edge.from);
     }
@@ -144,13 +218,30 @@ export function reviewMap(map: PreparedMap): string[] {
   return problems;
 }
 
+export function publishMap(map: PreparedMap): PreparedMap | null {
+  if (reviewMap(map).length) return null;
+  return {
+    ...map,
+    name: map.name.trim(),
+    places: map.places.map((p) => ({ ...p, name: p.name.trim() })),
+    published: true,
+  };
+}
+
 export function routeOnMap(
   map: PreparedMap,
   from: string,
   to: string,
   stepFree: boolean,
 ) {
-  const found = findRoute(from, to, stepFree, map.nodes, map.edges);
+  if (!map.published || reviewMap(map).length) return null;
+  const found = findRoute(
+    from,
+    to,
+    stepFree,
+    map.nodes,
+    map.edges.filter((e) => canWalk(e, stepFree)),
+  );
   if (!found) return null;
   return describeMapRoute(map, found.points);
 }
@@ -161,9 +252,14 @@ export function routesOnMap(
   to: string,
   stepFree: boolean,
 ) {
-  return findRouteAlternatives(from, to, stepFree, map.nodes, map.edges).map(
-    (route) => describeMapRoute(map, route.points),
-  );
+  if (!map.published || reviewMap(map).length) return [];
+  return findRouteAlternatives(
+    from,
+    to,
+    stepFree,
+    map.nodes,
+    map.edges.filter((e) => canWalk(e, stepFree)),
+  ).map((route) => describeMapRoute(map, route.points));
 }
 
 function describeMapRoute(map: PreparedMap, points: PathNode[]) {

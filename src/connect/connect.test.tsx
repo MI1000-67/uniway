@@ -1,3 +1,4 @@
+import { demoLocation } from "../locations";
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -12,6 +13,7 @@ import ConnectView from "./ConnectView";
 
 beforeEach(() => {
   sessionStorage.clear();
+  window.history.replaceState(null, "", "/");
   HTMLDialogElement.prototype.showModal = vi.fn(function (
     this: HTMLDialogElement,
   ) {
@@ -29,6 +31,44 @@ afterEach(() => {
 });
 
 describe("UniWay Connect (Module B) - Seller & Volunteer Management", () => {
+  it("clears previous directions when a Connect location is unavailable", () => {
+    render(<App />);
+    const goConnect = () =>
+      fireEvent.click(screen.getByRole("button", { name: "UniWay Connect" }));
+    goConnect();
+    fireEvent.click(screen.getAllByRole("button", { name: "Navigate" })[1]);
+    expect(screen.getByRole("button", { name: "End directions" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "School of Science" }),
+    ).toBeTruthy();
+    goConnect();
+    fireEvent.click(screen.getByRole("button", { name: /^Volunteer/ }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Directions" })[0]);
+    expect(screen.queryByRole("button", { name: "End directions" })).toBeNull();
+    expect(
+      screen.queryByRole("heading", { name: "School of Science" }),
+    ).toBeNull();
+    expect(
+      screen.getByText(
+        /No verified route is available for University Sports Ground/,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Showing map for:/)).toBeNull();
+  }, 30000);
+  it("routes Student Centre using its exact place reference", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "UniWay Connect" }));
+    const title = screen.getByText(/GreenExE/);
+    fireEvent.click(
+      within(title.closest(".connect-card")!).getByRole("button", {
+        name: "Navigate",
+      }),
+    );
+    expect(
+      screen.getByRole("heading", { name: "Student Centre" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "End directions" })).toBeTruthy();
+  }, 30000);
   it("renders the hero banner with approved tagline", () => {
     render(
       <ConnectView
@@ -41,7 +81,9 @@ describe("UniWay Connect (Module B) - Seller & Volunteer Management", () => {
       screen.getByText("Find your way. Find your community."),
     ).toBeTruthy();
     expect(
-      screen.getByText(/UniWay Connect · Smart Campus Ecosystem/i),
+      screen.getByText(
+        /UniWay Connect · (Interactive demo|Smart Campus Ecosystem)/i,
+      ),
     ).toBeTruthy();
   });
 
@@ -194,7 +236,7 @@ describe("UniWay Connect (Module B) - Seller & Volunteer Management", () => {
     expect(screen.getByText("Status: CLOSED")).toBeTruthy();
   });
 
-  it("triggers cross-module navigation callback with verified location details", () => {
+  it("passes an exact demo reference separately from pickup display text", () => {
     const handleNavigate = vi.fn();
     render(
       <ConnectView
@@ -209,7 +251,7 @@ describe("UniWay Connect (Module B) - Seller & Volunteer Management", () => {
     fireEvent.click(navigateBtns[0]);
 
     expect(handleNavigate).toHaveBeenCalledWith(
-      "science",
+      demoLocation("science"),
       "School of Science — Ground Floor Foyer",
     );
   });

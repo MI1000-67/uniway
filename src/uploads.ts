@@ -1,7 +1,23 @@
-export const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
-export function validateImage(file: { type: string; size: number }) {
-  if (!IMAGE_TYPES.includes(file.type))
-    return "Choose a JPEG, PNG, or WebP image.";
+import { isHeicFile } from "./heicConverter";
+
+export const IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+];
+
+export const HEIC_EXTENSIONS = [".heic", ".heif"];
+
+export function validateImage(file: {
+  type: string;
+  size: number;
+  name?: string;
+}) {
+  const isTypeSupported = IMAGE_TYPES.includes(file.type);
+  const isHeic = isHeicFile(file);
+  if (!isTypeSupported && !isHeic) return "Choose a JPEG, PNG, or WebP image.";
   if (file.size > 15 * 1024 * 1024)
     return "This image is too large. Choose an image under 15 MB.";
   if (file.size === 0)

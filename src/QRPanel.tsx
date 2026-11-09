@@ -10,6 +10,7 @@ import {
 import { SAMPLE_QR } from "./campus";
 import { parseQR } from "./session";
 import { loadImage, validateImage } from "./uploads";
+import { convertHeicToJpegBlob, isHeicFile } from "./heicConverter";
 export async function decodeQR(
   source: CanvasImageSource,
   width: number,
@@ -154,7 +155,24 @@ export default function QRPanel({
       return;
     }
     setBusy(true);
-    const url = URL.createObjectURL(file);
+    let blob: Blob = file;
+    if (isHeicFile(file)) {
+      try {
+        blob = await convertHeicToJpegBlob(file);
+      } catch (err) {
+        if (active.current) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Failed to convert HEIC image.",
+          );
+          setBusy(false);
+          if (fileInput.current) fileInput.current.value = "";
+        }
+        return;
+      }
+    }
+    const url = URL.createObjectURL(blob);
     try {
       const image = await loadImage(url);
       const result = await decodeQR(
@@ -235,7 +253,7 @@ export default function QRPanel({
         ref={fileInput}
         type="file"
         className="sr-only"
-        accept="image/jpeg,image/png,image/webp"
+        accept=".heic,.heif,image/jpeg,image/png,image/webp,image/heic,image/heif"
         aria-label="Choose QR image"
         onChange={(e) => void readFile(e.target.files?.[0])}
       />

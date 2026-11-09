@@ -2,6 +2,10 @@
 
 Main workspace: `C:/Project/experiment`. Source: `C:/Project/anti unieway/uniway-date-publish`. The approved green/glass UI remains the main interface.
 
+## November 2026 correction
+
+Subsequent core work reintroduced title-triggered layouts and automatic accessibility. The approved correction removes those presets again while retaining generic OCR/geometry work. Indoor linework can now propose reviewable paths constrained by detected walls; it does not establish verified corridors. Uploaded edges carry independent pedestrian/accessibility review, and both are invalidated by endpoint movement. See [current contracts](docs/navigation-contracts.md) and the dated validation entry. The original migration analysis below is historical context, not a current accuracy claim.
+
 ## Analysis and decision
 
 The source adds useful palette segmentation, color-legend matching, unresolved labels, indoor room candidates, and Unicode search. Its 49 tests passed during inspection, but some tests expect hardcoded campus outputs: a blank image named `science-faculty-map.jpg` produced 23 places and 77 edges. Its indoor routine also connected sealed rooms through walls. Those behaviors cannot be treated as extraction accuracy.

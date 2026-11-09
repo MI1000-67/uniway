@@ -1,5 +1,54 @@
 # Uniway validation
 
+## Current validation — 9 November 2026 (Full Roadmap: Build Stability, In-Browser HEIC Processing, Privacy Enforcement, Visitor Walkthrough & Repo Presentation Upgrade)
+
+- **Verification Summary**:
+  - **TypeScript:** `npm run check` passed with **0 errors** in strict mode.
+  - **Automated tests:** `npm test` passed **156 tests across 20 test files** (100% pass rate).
+  - **Offline OCR:** `npm run engine:check` passed: 8 languages, 15 runtime/license files, trained-data license integrity verified.
+  - **Code Style:** `npm run format:check` passed cleanly across all TypeScript, TSX, Markdown, and JSON files.
+  - **Production build:** `npm run build` passed (`tsc -b && vite build` in 8.66 s). Dynamic code splitting properly isolated `heic2any` into an on-demand vendor chunk (`dist/assets/heic2any-*.js`), keeping initial load lean.
+- **R1: Error Resolution & Build Stability**:
+  - Resolved Vite ambient type definitions (`src/vite-env.d.ts`), eliminating Node `process` compilation issues.
+  - Aligned tagline assertions in `src/connect/connect.test.tsx` to target specific role headings.
+  - Auto-formatted repository files to satisfy Prettier formatting requirements.
+- **R2: In-Browser HEIC/HEIF Map Upload Support & Privacy Protection**:
+  - Implemented client-side in-browser HEIC-to-JPEG conversion via `heic2any` in `src/heicConverter.ts`.
+  - Handles dual MIME and extension detection (`/\.hei[cf]$/i`), resolving empty `file.type` attributes on Windows and Linux Chromium browsers.
+  - Integrated into `src/UploadPanel.tsx` and `src/QRPanel.tsx` with dropzone acceptance (`.heic,.heif,image/jpeg,image/png,image/webp,image/heic,image/heif`).
+  - Privacy barrier: `.gitignore` explicitly blocks `*.heic`, `*.HEIC`, `*.heif`, `*.HEIF`, `55999.*`, `56002.*`, and `.local/`.
+  - Dedicated tests added in `src/privacy.test.ts` (3 tests) and `src/heicUpload.test.tsx` (13 tests), ensuring zero leakage into git or public assets.
+- **R4: Visitor Interactivity & Interactive Guided Walkthrough**:
+  - Implemented `src/VisitorTour.tsx` with 7 interactive stages: Welcome, Landmark Discovery, Details & Accessibility, Smart Routing, Step-Free Options, Live Turn-by-Turn Wayfinding, and UniWay Connect.
+  - Features live interactive callbacks directly driving the application state (`onSelectPlace`, `onStartRoute`, `onToggleStepFree`, `onSwitchView`).
+  - Full keyboard accessibility (`ArrowRight`, `ArrowLeft`, `Escape`), focus trapping, step dots, and responsive bottom sheet positioning.
+  - Styled with `#058C42` emerald accents, `--glass-dense` frosted glass panels, and day/night compatibility.
+  - Verified via 7 unit tests in `src/visitorTour.test.tsx`.
+- **R3: Repository Presentation Upgrade**:
+  - Upgraded `README.md` with official shields, quickstart instructions, feature walkthrough, architecture tree, and local privacy guarantees.
+  - Documented DX contracts and reproduction steps.
+
+## Previous validation — 8 November 2026 (approved Phase 1 correction)
+
+This entry supersedes the recognition and integration claims in the November 3 entry below. Earlier entries remain as historical records; passing tests did not establish extraction accuracy, verified pedestrian access or WCAG conformance.
+
+- **Recognition:** removed automatic Lower Level, Science Faculty, Jamestown and USJ coordinates/connections selected from titles or filenames. Preserved generic palette, numbered/color-directory matching, labels, regions and linework. Unlabelled indoor regions stay candidates. No model was trained.
+- **Evidence and review:** conflicting numbered positions remain unresolved regardless of label count. Detected graph edges now retain their origin and start with pedestrian/accessibility review false and no step-free claim. Publication and both prepared routing functions reject unreviewed/invalid graphs. Moving an endpoint invalidates review for its incident edges. Manually traced segments and detected suggestions remain editable.
+- **Indoor checks:** candidate regions use the geometry image's coordinate frame during extraction. Links, simplified segments and proposed label approaches are checked against the detected wall mask. Synthetic sealed-room and open-doorway regressions pass. This is not a guarantee that a photographic wall mask is correct.
+- **Connect handoff:** exact map/version/place references replace display-name guessing. Student Centre resolves to `student`; Sports Ground remains unavailable because no destination exists. Missing references clear prior directions. A successful Connect action switches from an uploaded map to the intended demo building. Imported-map pickup integration remains future work.
+- **TypeScript:** `npm run check` passed.
+- **Automated tests:** `npm test -- --maxWorkers=2` passed **130 tests in 16 files** (19.34 s in this run). Focused safety tests also passed. One initial full-App test exceeded the 5 s default under load; its two cross-module interaction tests now use a scoped 30 s limit, consistent with existing full-App flows. No failing assertion was removed.
+- **Production build:** `npm run build` passed (Vite build 7.72 s). CSS, design tokens, street lamps, fictional-campus graph, package dependencies and Vite network policy were unchanged.
+- **OCR assets:** `npm run engine:check` passed offline: eight languages, 15 runtime/license files and trained-data license. Assets were not changed.
+- **Formatting:** `npm run format:check` passed after formatting changed files and the four previously reported Markdown files. No policy or roadmap semantics were changed by those four formatting corrections.
+- **Real browser:** `node scripts/browser-phase1.mjs http://127.0.0.1:5178` passed in isolated headless Edge against the production preview. It used a synthetic PNG generated in memory, actual same-origin local OCR, two observed places and a detected path. It verified that the global review checkbox cannot bypass segment review, walking routes work after pedestrian confirmation, unknown accessibility blocks step-free routing, and separate confirmation enables it. It also verified old-route clearing for Sports Ground and Student Centre navigation while an uploaded map was active.
+- **Responsive/browser evidence:** desktop 1440 × 900 and mobile 390 × 844; reviewed editor and mobile night route screenshots inspected. No horizontal overflow, page/console errors or external HTTP requests occurred in this workflow. Results/screenshots are ignored under `test-results/phase1/`. The known mobile header/logo overlap remains; these checks do not claim an accessibility audit pass.
+- **Browser execution limits:** sandboxed Edge could not start, so the test used an isolated browser and a localhost-only preview outside the sandbox. An intermediate approval-service usage limit prevented one launch; the later retry completed. Early harness attempts used a label the extractor did not recognize and tried the editor action from the Directions tab. The final fixture uses an explicit entrance label and opens Explore before editing. These were corrected in the reproducible harness, not hidden in claimed results.
+
+**Remaining limits:** real-map extraction accuracy, physical camera/compass behavior, all-language OCR quality and mobile performance are not established by this phase. Maps still require human verification. Connect remains an in-memory demo: state loss across module switches/reload, ungated management, volunteer capacity/notification issues, poll expiry, event dates and broader modal/header accessibility remain for later approved phases. No backend, deployment, GitHub change, cloud inference or automatic map persistence was introduced.
+
+DX contracts and reproduction steps: [navigation contracts](docs/navigation-contracts.md), [testing guide](docs/testing.md).
+
 ## Current validation — 3 November 2026 (Phase 1: UniWay Connect & Navigation Integration)
 
 - **Production build:** `npm run check` (`tsc --noEmit`) and `npm run build` (`tsc -b && vite build`) succeed with zero errors (build time 3.05s).

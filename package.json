@@ -9,6 +9,7 @@
     "test": "vitest run",
     "check": "tsc --noEmit",
     "test:watch": "vitest",
+    "test:browser": "node scripts/browser-phase1.mjs",
     "engine:check": "node scripts/check-local-ocr.mjs",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"scripts/*.mjs\" \"docs/**/*.md\" \"*.{md,json,ts}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"scripts/*.mjs\" \"docs/**/*.md\" \"*.{md,json,ts}\"",
@@ -21,6 +22,7 @@
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.2.0",
     "@fontsource-variable/manrope": "^5.2.0",
+    "heic2any": "^0.0.4",
     "jsqr": "^1.4.0",
     "lucide-react": "^0.468.0",
     "react": "^19.1.0",
@@ -29,6 +31,7 @@
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.0",
+    "@types/node": "^26.6.6",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^4.4.0",

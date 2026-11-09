@@ -1,3 +1,4 @@
+import { manualEdge, detectedEdge } from "./mapEdges";
 import { describe, expect, it } from "vitest";
 import {
   addConnection,
@@ -6,6 +7,9 @@ import {
   removeMapNode,
   reviewMap,
   routeOnMap,
+  routesOnMap,
+  reviewConnection,
+  publishMap,
 } from "./preparedMap";
 import type { PreparedMap } from "./preparedMap";
 
@@ -19,6 +23,7 @@ export function fixtureMap(): PreparedMap {
       height: 700,
     }),
     name: "My Campus",
+    published: true,
     nodes: [
       { id: "gate", x: 100, y: 100, landmark: "Main Entrance" },
       { id: "junction", x: 100, y: 400, landmark: "Garden junction" },
@@ -41,18 +46,87 @@ export function fixtureMap(): PreparedMap {
       },
     ],
     edges: [
-      { from: "gate", to: "junction", stepFree: true },
-      { from: "junction", to: "library", stepFree: true },
-      { from: "gate", to: "library", stepFree: false },
+      manualEdge("gate", "junction", true),
+      manualEdge("junction", "library", true),
+      manualEdge("gate", "library", false),
     ],
   };
 }
 
 describe("uploaded map routing", () => {
+  it("requires pedestrian review before publication and separate step-free confirmation", () => {
+    const draft = {
+      ...fixtureMap(),
+      published: false,
+      edges: [detectedEdge({ from: "gate", to: "library", stepFree: true })],
+    };
+    expect(draft.edges[0].stepFree).toBe(false);
+    expect(publishMap(draft)).toBeNull();
+    expect(
+      routeOnMap({ ...draft, published: true }, "gate", "library", false),
+    ).toBeNull();
+    expect(
+      routesOnMap({ ...draft, published: true }, "gate", "library", true),
+    ).toEqual([]);
+    const tooSoon = reviewConnection(
+      draft,
+      draft.edges[0],
+      "accessibility",
+      true,
+    );
+    expect(tooSoon.edges[0].stepFree).toBe(false);
+    const walking = reviewConnection(draft, draft.edges[0], "pedestrian", true);
+    expect(routeOnMap(walking, "gate", "library", false)).toBeNull();
+    const ready = publishMap(walking)!;
+    expect(routeOnMap(ready, "gate", "library", false)).not.toBeNull();
+    expect(routeOnMap(ready, "gate", "library", true)).toBeNull();
+    const accessible = reviewConnection(
+      walking,
+      walking.edges[0],
+      "accessibility",
+      true,
+    );
+    expect(
+      routeOnMap(publishMap(accessible)!, "gate", "library", true),
+    ).not.toBeNull();
+    expect(accessible.edges[0].origin).toBe("detected");
+    const revoked = reviewConnection(
+      accessible,
+      accessible.edges[0],
+      "pedestrian",
+      false,
+    );
+    expect(revoked.edges[0]).toMatchObject({
+      stepFree: false,
+      review: { pedestrian: false, accessibility: false },
+    });
+    expect(publishMap(revoked)).toBeNull();
+  });
+  it("rejects missing review metadata, dangling edges and forged accessibility", () => {
+    const map = fixtureMap();
+    const legacy = {
+      ...map,
+      edges: [
+        { from: "gate", to: "library", stepFree: true },
+      ] as PreparedMap["edges"],
+    };
+    expect(routeOnMap(legacy, "gate", "library", false)).toBeNull();
+    expect(
+      publishMap({ ...map, edges: [manualEdge("gate", "missing")] }),
+    ).toBeNull();
+    const forged = manualEdge("gate", "library");
+    forged.stepFree = true;
+    expect(publishMap({ ...map, edges: [forged] })).toBeNull();
+  });
   it("moving a pin preserves other bends and invalidates adjoining step-free claims", () => {
     const original = { ...fixtureMap(), published: true };
     const moved = moveMapNode(original, "library", { x: 450, y: 350 });
     expect(moved.published).toBe(false);
+    expect(
+      moved.edges
+        .filter((e) => e.to === "library")
+        .every((e) => !e.review.pedestrian && !e.review.accessibility),
+    ).toBe(true);
     expect(moved.nodes.find((n) => n.id === "junction")).toEqual(
       original.nodes.find((n) => n.id === "junction"),
     );
@@ -97,7 +171,7 @@ describe("uploaded map routing", () => {
   it("rejects disconnected places and unavailable step-free routes", () => {
     const map = {
       ...fixtureMap(),
-      edges: [{ from: "gate", to: "junction", stepFree: false }],
+      edges: [manualEdge("gate", "junction", false)],
     };
     expect(reviewMap(map).join(" ")).toContain("Connect these places");
     expect(routeOnMap(map, "gate", "library", false)).toBeNull();
@@ -107,7 +181,7 @@ describe("uploaded map routing", () => {
     expect(addConnection([], "gate", "gate", true)).toEqual([]);
     const edges = addConnection([], "gate", "library", false);
     expect(addConnection(edges, "library", "gate", true)).toEqual([
-      { from: "gate", to: "library", stepFree: true },
+      manualEdge("gate", "library", true),
     ]);
   });
   it("removes the place and incident paths when deleting a node", () => {

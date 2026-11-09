@@ -37,10 +37,10 @@ export function mergeDetections(
   const unresolved: UnresolvedLabel[] = [...layout.unresolvedLabels];
   const blockedNumbers = new Set<string>();
   const close = Math.max(12, Math.min(width, height) * 0.025);
-  const candidates =
-    layout.labels.length >= 10
-      ? [...layout.labels, ...primary.filter((l) => l.source === "legend")]
-      : [...primary.filter((l) => l.source === "legend"), ...layout.labels];
+  const candidates = [
+    ...primary.filter((l) => l.source === "legend"),
+    ...layout.labels,
+  ];
   for (const label of candidates) {
     if (label.number && blockedNumbers.has(label.number)) continue;
     if (
@@ -72,11 +72,6 @@ export function mergeDetections(
       Math.hypot(previous.x - label.x, previous.y - label.y) <= close
     )
       continue;
-    // Verified layout landmarks (e.g. from comprehensive campus directory or landmark detection)
-    // take precedence over unverified raw badge crops from primary detection.
-    if (layout.labels.length >= 10 && layout.labels.includes(previous)) {
-      continue;
-    }
     // A targeted digit read is stronger than a generic text-center observation,
     // but two legend positions for one key must remain unresolved.
     if (previous.source === "legend" && label.source === "label") {

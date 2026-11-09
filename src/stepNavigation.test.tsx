@@ -1,3 +1,4 @@
+import { manualEdge, detectedEdge } from "./mapEdges";
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
@@ -119,7 +120,7 @@ describe("turn-by-turn step navigation", () => {
         { id: "node-1", x: 100, y: 100, landmark: "Main Gate" },
         { id: "node-2", x: 200, y: 200, landmark: "Science Hall" },
       ],
-      edges: [{ from: "node-1", to: "node-2", stepFree: true }],
+      edges: [manualEdge("node-1", "node-2", true)],
       metersPerPixel: 1,
     };
 

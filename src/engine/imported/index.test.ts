@@ -236,48 +236,56 @@ describe("source-derived layout candidates", () => {
     );
   });
 
-  it("recognizes Science Faculty layout with 23 departments and connected walkways", () => {
-    const img = image(640, 453);
-    const result = analyzeLayout({
-      image: img,
-      lines: [
-        line("SCIENCE FACULTY MAP", 50, 40, 200, 20),
-        line("Cumaratunga Munidasa Mawatha", 30, 250, 150, 15),
-        line("Reid Avenue", 500, 300, 100, 15),
-      ],
-      name: "science-faculty-map.png",
-    });
-    expect(result.title).toBe("Science Faculty Map");
-    expect(result.labels.length).toBe(23);
-    expect(result.labels[0].text).toBe("Student Service Centre (Upcoming)");
-    expect(result.nodes?.length).toBeGreaterThanOrEqual(23);
-    expect(result.edges.length).toBeGreaterThanOrEqual(30);
+  it.each([
+    "SCIENCE FACULTY MAP",
+    "University of Jamestown",
+    "Faculty of Applied Sciences",
+  ])("does not invent a campus from the title %s", (title) => {
+    for (const [width, height] of [
+      [768, 1024],
+      [600, 300],
+      [300, 600],
+    ]) {
+      const result = analyzeLayout({
+        image: image(width, height),
+        lines: [line(title, 15, 15, 220, 15)],
+        name: title + ".png",
+      });
+      expect(result.labels).toEqual([]);
+      expect(result.edges).toEqual([]);
+      expect(result.candidateRegions).toEqual([]);
+    }
   });
-
-  it("recognizes Lower Level - 2 indoor floor plan with 12 rooms and verified walkway network", () => {
-    const img = image(768, 1024);
+  it.each(["Lower Level - 2.png", "photo.png"])(
+    "keeps observed indoor labels without a preset: %s",
+    (name) => {
+      const text = [
+        "LOWER LEVEL - 2",
+        "YOU ARE HERE",
+        "ACADEMIC STAFF",
+        "LECTURE HALLS",
+        "COMPUTER ROOM",
+        "STAFF DINING & RESTROOM",
+        "L202",
+        "L203",
+      ];
+      const result = analyzeLayout({
+        image: image(768, 1024),
+        name,
+        lines: text.map((t, i) => line(t, 60, 40 + i * 35, 240, 15)),
+      });
+      expect(result.labels.every((l) => text.includes(l.text))).toBe(true);
+      expect(result.labels.length).toBeLessThanOrEqual(text.length);
+      expect(result.edges).toEqual([]);
+    },
+  );
+  it("does not generate a known floor plan from a filename and generic room text", () => {
     const result = analyzeLayout({
-      image: img,
-      lines: [
-        line("LOWER LEVEL - 2", 300, 600, 180, 25),
-        line("YOU ARE HERE", 380, 340, 60, 12),
-        line("ACADEMIC STAFF", 50, 520, 100, 12),
-        line("LECTURE HALLS", 50, 550, 100, 12),
-        line("COMPUTER ROOM", 50, 580, 100, 12),
-        line("STAFF DINING & RESTROOM", 50, 610, 140, 12),
-        line("L202", 380, 170, 40, 12),
-        line("L203", 330, 240, 40, 12),
-      ],
-      name: "20261102_131215.jpg",
+      image: image(768, 1024),
+      name: "Lower Level - 2.jpg",
+      lines: [line("Lecture Hall", 100, 200)],
     });
-    expect(result.title).toBe("Lower Level - 2");
-    expect(result.layoutKind).toBe("floorplan");
-    expect(result.labels.length).toBe(12);
-    expect(result.labels.some((l) => l.text === "YOU ARE HERE")).toBe(true);
-    expect(result.labels.some((l) => l.text.includes("Lecture Hall"))).toBe(
-      true,
-    );
-    expect(result.nodes?.length).toBeGreaterThanOrEqual(15);
-    expect(result.edges.length).toBeGreaterThanOrEqual(20);
+    expect(result.labels.every((l) => l.text === "Lecture Hall")).toBe(true);
+    expect(result.edges).toEqual([]);
   });
 });

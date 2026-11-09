@@ -3,7 +3,9 @@
  * Copyright (c) 2026 UniWay contributors, MIT; see LICENSE in this directory.
  * Complete vision engine with campus directory matching, road skeletonization, and walkway topology.
  */
-import type { PathEdge, PathNode } from "../../campus";
+import type { PathNode } from "../../campus";
+import { detectedEdge } from "../../mapEdges";
+import type { PreparedEdge } from "../../mapEdges";
 import type { DetectedLabel, OCRLine } from "../types";
 import { analyzeRaster } from "./vision";
 import type {
@@ -117,7 +119,7 @@ export function analyzeLayout({
 
   // Build graph nodes and edges
   const nodes: PathNode[] = [];
-  const edges: PathEdge[] = [];
+  const edges: PreparedEdge[] = [];
   const nodeLookup = new Set<string>();
 
   const addNode = (id: string, x: number, y: number, landmark: string) => {
@@ -127,9 +129,7 @@ export function analyzeLayout({
     }
   };
 
-  for (const p of result.places) {
-    addNode(p.id, p.x, p.y, p.name);
-  }
+  // Label centres are not entrances. Keep graph nodes on observed linework.
   for (const j of result.junctions) {
     addNode(j.id, j.x, j.y, "the marked path");
   }
@@ -138,28 +138,34 @@ export function analyzeLayout({
     const e = result.edges[eIdx];
     const pts = e.points && e.points.length > 1 ? e.points : null;
     if (!pts || pts.length <= 2) {
-      edges.push({
-        from: e.a,
-        to: e.b,
-        stepFree: e.accessible,
-      });
+      edges.push(
+        detectedEdge({
+          from: e.a,
+          to: e.b,
+          stepFree: e.accessible,
+        }),
+      );
     } else {
       let prevId = e.a;
       for (let k = 1; k < pts.length - 1; k++) {
         const bendId = `bend-${eIdx}-${k}`;
         addNode(bendId, pts[k].x, pts[k].y, "the marked path");
-        edges.push({
-          from: prevId,
-          to: bendId,
-          stepFree: e.accessible,
-        });
+        edges.push(
+          detectedEdge({
+            from: prevId,
+            to: bendId,
+            stepFree: e.accessible,
+          }),
+        );
         prevId = bendId;
       }
-      edges.push({
-        from: prevId,
-        to: e.b,
-        stepFree: e.accessible,
-      });
+      edges.push(
+        detectedEdge({
+          from: prevId,
+          to: e.b,
+          stepFree: e.accessible,
+        }),
+      );
     }
   }
 

@@ -1,3 +1,5 @@
+import type { LocationReference } from "../locations";
+
 export type ConnectCategory =
   "All" | "Textbooks" | "Tech" | "Supplies" | "Snacks" | "Competitions";
 
@@ -19,7 +21,7 @@ export interface CommunityPost {
   quantity?: number;
   sellerName: string;
   sellerContact?: string;
-  placeId?: string; // Node/Place ID in Module A (e.g. 'library', 'science', 'cafe')
+  location?: LocationReference;
   locationName: string; // Human readable label (e.g. 'Central Library, Room L202')
   status: ItemStatus;
   badge?: string;
@@ -38,7 +40,7 @@ export interface VolunteerOpportunity {
   spotsTotal: number;
   spotsFilled: number;
   eventDate: string;
-  placeId?: string;
+  location?: LocationReference;
   locationName: string;
   requirements: string[];
   status: "open" | "closed";

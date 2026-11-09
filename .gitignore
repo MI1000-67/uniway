@@ -4,6 +4,7 @@ dist/
 .vite/
 .npm-cache/
 test-results/
+.agents/
 .local/
 public/ocr/
 .env
@@ -14,3 +15,9 @@ eng.traineddata
 *.jpg
 *.jpeg
 *.png
+*.heic
+*.HEIC
+*.heif
+*.HEIF
+55999.*
+56002.*

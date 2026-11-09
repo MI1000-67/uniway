@@ -1,5 +1,6 @@
 /** Adapted from UniWay (MIT), © 2026 UniWay contributors. */
-import type { PathEdge, PathNode } from "../../campus";
+import type { PathNode } from "../../campus";
+import type { PreparedEdge } from "../../mapEdges";
 import type { DetectedLabel, OCRLine, PixelImage } from "../types";
 
 export type Component = {
@@ -45,7 +46,7 @@ export type LayoutAnalysis = {
   candidateRegions: CandidateRegion[];
   warnings: string[];
   nodes?: PathNode[];
-  edges: PathEdge[];
+  edges: PreparedEdge[];
   buildings?: CandidateRegion[];
   roads?: { x: number; y: number }[][];
 };

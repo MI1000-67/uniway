@@ -1,3 +1,6 @@
+import { resolveDemoLocation } from "./locations";
+import { appViewUrl, readAppView } from "./appUrl";
+import type { LocationReference } from "./locations";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -45,6 +48,7 @@ import { useVisitorSession } from "./useVisitorSession";
 import { useTheme } from "./useTheme";
 import MapEditor from "./MapEditor";
 import PreparedMapExplorer from "./PreparedMapExplorer";
+import VisitorTour from "./VisitorTour";
 import { newMap } from "./preparedMap";
 import type { PreparedMap } from "./preparedMap";
 import ConnectView from "./connect/ConnectView";
@@ -100,79 +104,56 @@ export default function App() {
   const imagesRef = useRef(images);
   imagesRef.current = images;
   const [toast, setToast] = useState("");
+  const [tourOpen, setTourOpen] = useState(false);
   const [view, setView] = useState<"navigate" | "connect">(() => {
-    if (typeof window !== "undefined") {
-      if (
-        window.location.pathname === "/connect" ||
-        window.location.hash.includes("connect")
-      ) {
-        return "connect";
-      }
-    }
-    return "navigate";
+    return typeof window !== "undefined"
+      ? readAppView(window.location)
+      : "navigate";
   });
 
   const switchView = useCallback((newView: "navigate" | "connect") => {
     setView(newView);
     if (typeof window !== "undefined" && window.history) {
-      if (newView === "connect") {
-        window.history.pushState(null, "", "/connect");
-      } else {
-        window.history.pushState(null, "", "/");
-      }
+      window.history.pushState(null, "", appViewUrl(newView));
     }
   }, []);
 
   useEffect(() => {
     const onPopState = () => {
-      if (
-        window.location.pathname === "/connect" ||
-        window.location.hash.includes("connect")
-      ) {
-        setView("connect");
-      } else {
-        setView("navigate");
-      }
+      setView(readAppView(window.location));
     };
     window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
+    window.addEventListener("hashchange", onPopState);
+    return () => {
+      window.removeEventListener("popstate", onPopState);
+      window.removeEventListener("hashchange", onPopState);
+    };
   }, []);
 
   const handleConnectNavigate = useCallback(
-    (placeId?: string, locationName?: string) => {
+    (location?: LocationReference, locationName?: string) => {
+      const destination = resolveDemoLocation(location);
       switchView("navigate");
-      if (placeId) {
-        const matchedPlace = places.find(
-          (p) => p.id === placeId || p.nodeId === placeId,
-        );
-        if (matchedPlace) {
-          setSelected(matchedPlace);
-          setRouteMode(true);
-          setRouteRequested(true);
-          setExpanded(true);
-          setToast(`Routing to ${matchedPlace.shortName}`);
-          return;
-        }
-      }
-      if (locationName) {
-        const searchMatch = places.find(
-          (p) =>
-            locationName.toLowerCase().includes(p.shortName.toLowerCase()) ||
-            locationName.toLowerCase().includes(p.name.toLowerCase()),
-        );
-        if (searchMatch) {
-          setSelected(searchMatch);
-          setRouteMode(true);
-          setRouteRequested(true);
-          setExpanded(true);
-          setToast(`Routing to ${searchMatch.shortName}`);
-        } else {
-          setQuery(locationName);
-          setToast(`Showing map for: ${locationName}`);
-        }
-      }
+      setActiveMapId(null);
+      setSelected(destination);
+      setRouteMode(!!destination);
+      setRouteRequested(!!destination && !expired);
+      setActiveRouteIndex(0);
+      setCurrentStepIndex(0);
+      setQuery("");
+      setCategory("All");
+      setCollapsed(false);
+      setExpanded(true);
+      setRouteVersion((version) => version + 1);
+      setToast(
+        expired
+          ? "Scan an entrance code to start a fresh visitor session."
+          : destination
+            ? `Routing to ${destination.shortName} on the demo campus. Check the listing for pickup details.`
+            : `No verified route is available for ${locationName || "this location"}. Choose a mapped destination.`,
+      );
     },
-    [switchView],
+    [switchView, expired],
   );
   const contentRef = useRef<HTMLDivElement>(null);
   const matches = useMemo(
@@ -423,6 +404,16 @@ export default function App() {
             <span>Scan QR</span>
           </button>
           <button
+            className="header-tour-btn"
+            type="button"
+            aria-label="Start guided tour"
+            title="Interactive campus tour"
+            onClick={() => setTourOpen(true)}
+          >
+            <Sparkles size={16} />
+            <span>Tour</span>
+          </button>
+          <button
             className="help-button icon-button"
             aria-label="About Uniway"
             onClick={() => setDialog("about")}
@@ -540,6 +531,14 @@ export default function App() {
                           <br />
                           Let’s find where you need to be.
                         </p>
+                        <button
+                          type="button"
+                          className="explore-tour-cta"
+                          onClick={() => setTourOpen(true)}
+                        >
+                          <Sparkles size={14} />
+                          <span>Take interactive tour</span>
+                        </button>
                       </div>
                       <div className="desktop-search">{searchInput()}</div>
                       <div className="category-list" aria-label="Filter places">
@@ -1187,6 +1186,24 @@ export default function App() {
           </div>
         </Modal>
       )}
+      <VisitorTour
+        isOpen={tourOpen}
+        onClose={() => setTourOpen(false)}
+        onSelectPlace={(placeId) => {
+          const p = places.find((pl) => pl.id === placeId);
+          if (p) selectPlace(p);
+        }}
+        onStartRoute={(placeId) => {
+          const p = places.find((pl) => pl.id === placeId);
+          if (p) {
+            selectPlace(p);
+            setRouteMode(true);
+            setRouteRequested(true);
+          }
+        }}
+        onToggleStepFree={(val) => setStepFree(val)}
+        onSwitchView={(newView) => switchView(newView)}
+      />
     </div>
   );
 }

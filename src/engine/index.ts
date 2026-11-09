@@ -1,4 +1,5 @@
 import type { Worker as OCRWorker } from "tesseract.js";
+import { ocrAssetBase } from "../appUrl";
 import type { UploadedImage } from "../UploadPanel";
 import { newMap } from "../preparedMap";
 import type { PreparedMap } from "../preparedMap";
@@ -11,7 +12,9 @@ import {
   assessQuality,
   cleanNumberBadge,
   extractIndoorLinework,
+  hasLineOfSight,
 } from "./core";
+import { detectWalls } from "./imported/floorplan";
 import type { Linework } from "./core";
 import type { Crop, EngineReport, PixelImage } from "./types";
 import { layoutLanguages } from "./languages";
@@ -209,7 +212,7 @@ export async function analyzeUploadedMap(
     update("Loading local text recognition", 0.08);
     const { createWorker, PSM } = await import("tesseract.js");
     workSignal.throwIfAborted();
-    const assetBase = new URL("./ocr/", document.baseURI);
+    const assetBase = ocrAssetBase(window.location.origin);
     const selected = language === "eng" ? "eng" : `${language}+eng`;
     ocr = await abortable(
       createWorker(selected, 1, {
@@ -357,6 +360,7 @@ export async function analyzeUploadedMap(
       }),
       workSignal,
     );
+    const pathRegions = layout.candidateRegions;
     // Convert the source-derived pixel coordinates back to the OCR image space.
     layout.labels = layout.labels.map((l) => ({
       ...l,
@@ -398,30 +402,43 @@ export async function analyzeUploadedMap(
           : geometry.path.edges,
     };
     if (layout.layoutKind === "floorplan") {
-      const indoor = extractIndoorLinework(pathImage, layout.candidateRegions);
-      if (indoor.nodes.length > 0) {
-        path = {
-          nodes: indoor.nodes.map((n) => ({
-            ...n,
-            x: n.x / pathXScale,
-            y: n.y / pathYScale,
-          })),
-          edges: indoor.edges,
-        };
-      }
+      const indoor = extractIndoorLinework(pathImage, pathRegions);
+      path = {
+        nodes: indoor.nodes.map((n) => ({
+          ...n,
+          x: n.x / pathXScale,
+          y: n.y / pathYScale,
+        })),
+        edges: indoor.edges,
+      };
     }
     // Complex photographs do not reliably separate walls from walkways. Keep
     // useful labels but withhold path suggestions when evidence is weak.
     const quality = assessQuality(pixels, labels);
-    if (
-      quality.level === "limited" &&
-      (!layout.edges || layout.edges.length === 0) &&
-      layout.layoutKind !== "floorplan"
-    ) {
+    if (quality.level === "limited") {
       path.nodes = [];
       path.edges = [];
     }
-    const graph = attachPlaces(labels, path, width, height);
+    const wallMask =
+      layout.layoutKind === "floorplan" ? detectWalls(pathImage) : null;
+    const graph = attachPlaces(
+      labels,
+      path,
+      width,
+      height,
+      wallMask
+        ? (label, node) =>
+            hasLineOfSight(
+              label.x * pathXScale,
+              label.y * pathYScale,
+              node.x * pathXScale,
+              node.y * pathYScale,
+              wallMask,
+              pathImage.width,
+              pathImage.height,
+            )
+        : undefined,
+    );
     const warnings = [
       ...layout.warnings,
       "Check names and approach points against the map. Detected paths may include roads; confirm pedestrian access and crossings.",
@@ -443,7 +460,7 @@ export async function analyzeUploadedMap(
       height: (r.height * source.naturalHeight) / height,
     }));
     const analysis: EngineReport = {
-      version: "local-2",
+      version: "local-3-reviewed-edges",
       language,
       quality,
       summary: `${labels.length} places found${unresolved.length ? ` · ${unresolved.length} labels to place` : ""}${graph.edges.length ? " with visible path suggestions" : "; ready to refine"}.`,

@@ -1,3 +1,4 @@
+import { manualEdge, detectedEdge } from "./mapEdges";
 // @vitest-environment jsdom
 import { useState } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -38,6 +39,54 @@ const fixture: PreparedMap = {
 };
 afterEach(cleanup);
 describe("guided map preparation", () => {
+  it("reviews a suggested path separately from step-free access before publication", () => {
+    const publish = vi.fn();
+    function Harness() {
+      const [map, setMap] = useState({
+        ...fixture,
+        edges: [detectedEdge({ from: "gate", to: "library", stepFree: true })],
+      });
+      return (
+        <MapEditor
+          map={map}
+          onChange={setMap}
+          onPublish={publish}
+          onBack={vi.fn()}
+        />
+      );
+    }
+    render(<Harness />);
+    fireEvent.click(screen.getByLabelText(/I’ve checked/));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open interactive map" }),
+    );
+    expect(publish).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Review next path" }));
+    const access = screen.getByLabelText(
+      "Verified step-free path to Library",
+    ) as HTMLInputElement;
+    expect(access.disabled).toBe(true);
+    fireEvent.click(screen.getByLabelText("Walkable path to Library"));
+    expect(access.checked).toBe(false);
+    expect(access.disabled).toBe(false);
+    fireEvent.click(access);
+    fireEvent.click(screen.getByLabelText(/I’ve checked/));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open interactive map" }),
+    );
+    expect(publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        published: true,
+        edges: [
+          expect.objectContaining({
+            origin: "detected",
+            stepFree: true,
+            review: { pedestrian: true, accessibility: true },
+          }),
+        ],
+      }),
+    );
+  });
   it("places unresolved names with the keyboard and supports undo", () => {
     function Harness() {
       const [map, setMap] = useState({
@@ -88,7 +137,7 @@ describe("guided map preparation", () => {
     function Harness() {
       const [map, setMap] = useState({
         ...fixture,
-        edges: [{ from: "gate", to: "library", stepFree: true }],
+        edges: [manualEdge("gate", "library", true)],
       });
       return (
         <MapEditor
@@ -125,13 +174,14 @@ describe("guided map preparation", () => {
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
+    fireEvent.click(screen.getByLabelText("Walkable path to Main Entrance"));
     fireEvent.click(screen.getByLabelText(/I’ve checked/));
     fireEvent.click(
       screen.getByRole("button", { name: "Open interactive map" }),
     );
     expect(publish).toHaveBeenCalledWith(
       expect.objectContaining({
-        edges: [{ from: "gate", to: "library", stepFree: false }],
+        edges: [manualEdge("gate", "library", false)],
         places: expect.arrayContaining([
           expect.objectContaining({
             name: "Library",
@@ -193,7 +243,7 @@ describe("guided map preparation", () => {
     expect(publish).toHaveBeenCalledWith(
       expect.objectContaining({
         published: true,
-        edges: [{ from: "gate", to: "library", stepFree: false }],
+        edges: [manualEdge("gate", "library", false)],
       }),
     );
   });
@@ -230,7 +280,7 @@ describe("guided map preparation", () => {
       <PreparedMapExplorer
         map={{
           ...fixture,
-          edges: [{ from: "gate", to: "library", stepFree: false }],
+          edges: [manualEdge("gate", "library", false)],
           published: true,
         }}
         onDemo={vi.fn()}
