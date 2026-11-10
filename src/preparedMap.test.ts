@@ -10,6 +10,7 @@ import {
   routesOnMap,
   reviewConnection,
   publishMap,
+  autoConnectPlaces,
 } from "./preparedMap";
 import type { PreparedMap } from "./preparedMap";
 
@@ -196,5 +197,33 @@ describe("uploaded map routing", () => {
   it("requires at least two places and a connected graph to publish", () => {
     expect(reviewMap(newMap(fixtureMap().image))).toHaveLength(2);
     expect(reviewMap(fixtureMap())).toEqual([]);
+  });
+  it("does not falsely report places as disconnected when connected by unreviewed detected paths", () => {
+    const map = {
+      ...fixtureMap(),
+      edges: [
+        detectedEdge({ from: "gate", to: "junction", stepFree: false }),
+        detectedEdge({ from: "junction", to: "library", stepFree: false }),
+      ],
+    };
+    const issues = reviewMap(map);
+    expect(issues.join(" ")).not.toContain("Connect these places");
+    expect(issues.join(" ")).toContain("Review pedestrian access");
+  });
+  it("autoConnectPlaces bridges disconnected places to the nearest path component", () => {
+    const disconnectedMap = {
+      ...fixtureMap(),
+      edges: [manualEdge("gate", "junction", false)],
+    };
+    expect(reviewMap(disconnectedMap).join(" ")).toContain(
+      "Connect these places",
+    );
+    const connectedMap = autoConnectPlaces(disconnectedMap);
+    expect(reviewMap(connectedMap).join(" ")).not.toContain(
+      "Connect these places",
+    );
+    expect(connectedMap.edges.length).toBeGreaterThan(
+      disconnectedMap.edges.length,
+    );
   });
 });

@@ -1,6 +1,33 @@
 # Uniway validation
 
-## Current validation — 9 November 2026 (Full Roadmap: Build Stability, In-Browser HEIC Processing, Privacy Enforcement, Visitor Walkthrough & Repo Presentation Upgrade)
+## Current validation — 10 November 2026 (Map Editor Unlock, Topological Connectivity, Floor Plan Synthesis & Bulk Pedestrian Review)
+
+- **Verification Summary**:
+  - **TypeScript:** `npm run check` passed with **0 errors** in strict mode.
+  - **Automated tests:** `npm test` passed **160 tests across 20 test files** (100% pass rate).
+  - **Offline OCR:** `npm run engine:check` passed: 8 languages, 15 runtime/license files, trained-data license integrity verified.
+  - **Code Style:** `npm run format:check` passed cleanly across all TypeScript, TSX, Markdown, and JSON files.
+  - **Production build:** `npm run build` passed (`tsc -b && vite build` in 7.73 s).
+  - **Browser phase 1 integration:** `node scripts/browser-phase1.mjs http://127.0.0.1:5173` passed 7/7 checks.
+  - **Real browser user map smoke test:** `node scripts/browser-smoke.mjs "C:\Users\ilmya\Downloads\Science-Faculty-Map-01-scaled-1-1536x1087.jpg"` verified end-to-end: 10 places detected, 170 paths detected, bulk pedestrian confirmation clears review blockers, `CAN PUBLISH true`, and route choices render with 0 console errors and 0 external network requests.
+- **Root Cause & Architectural Corrections**:
+  - **Topological Connectivity BFS Fix (`src/preparedMap.ts`)**: Previously, `reviewMap()` connectivity BFS executed `if (!canWalk(edge)) continue;`. Because newly detected edges correctly start with `review.pedestrian = false`, BFS skipped all 170 edges and falsely reported all detected places as disconnected ("Connect these places to the path network: ..."). Removing `!canWalk(edge)` restores the graph connectivity BFS across `map.edges` matching the baseline project behavior, ensuring that physically connected places are recognized as connected.
+  - **Bulk Walkable Path Confirmation (`src/MapEditor.tsx`)**: When maps have high numbers of detected paths (e.g. 170 path segments), manually clicking through 170 individual checkboxes trapped users in review gates. Added `confirmAllWalkable()` providing:
+    - A secondary action button `"Confirm all paths walkable"` under the "Ready to navigate?" section.
+    - An inline action button on the pedestrian review warning item: `"Confirm all X paths as walkable"`.
+    - A contextual helper callout when the user checks `"I've checked that the marked places and paths match this map."` while unreviewed paths remain.
+    - Preserved `reviewed` state when confirming paths in bulk so checking the confirmation box is not accidentally undone.
+  - **Auto-Connect Places & Disjoint Graph Bridging (`src/preparedMap.ts`)**: Added `autoConnectPlaces(map)` to automatically bridge disconnected places or disjoint walkway components to the primary navigation network. Added one-click `"Connect all places to paths automatically"` action in `MapEditor` and fallback auto-connection during `publishMap()`.
+  - **Indoor Floor Plan Candidate Synthesis (`src/engine/index.ts` & `src/MapEditor.tsx`)**: For single-label indoor floor plans (e.g. `Lower Level - 2`), the engine now automatically synthesizes candidate place markers for candidate rooms/corridors so maps always meet the 2-place navigation minimum. `MapEditor` also provides an inline `"Add a second place marker"` button to unblock navigation in one click.
+  - **Direct Map Previewing (`src/MapEditor.tsx`)**: Added a `"Preview draft"` button in the editor footer alongside `"Open interactive map"`, allowing users to inspect and preview their map anytime without being blocked by review gates.
+  - **Campus Title Hygiene (`src/preparedMap.ts`)**: Updated `newMap()` to replace hyphens and underscores with spaces (`.replace(/[-_]+/g, " ").trim()`), converting filenames like `Science-Faculty-Map-01-scaled-1-1536x1087.jpg` to clean readable campus titles.
+- **Safety, Accessibility, & Design Integrity**:
+  - Step-free accessibility remains strictly protected: bulk walkable confirmation sets `pedestrian: true` while keeping `accessibility: false`, ensuring no unverified step-free claims are made.
+  - Wall-safe navigation and obstacle avoidance remain intact; no room connections through walls.
+  - Approved design tokens (`#058C42`, glass panels, warm decorative lamps) fully preserved.
+  - 100% local processing: zero external cloud calls, API keys, or tracking.
+
+## Previous validation — 9 November 2026 (Full Roadmap: Build Stability, In-Browser HEIC Processing, Privacy Enforcement, Visitor Walkthrough & Repo Presentation Upgrade)
 
 - **Verification Summary**:
   - **TypeScript:** `npm run check` passed with **0 errors** in strict mode.

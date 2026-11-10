@@ -134,6 +134,10 @@ export function analyzeLayout({
     addNode(j.id, j.x, j.y, "the marked path");
   }
 
+  for (const p of result.places) {
+    addNode(p.id, p.x, p.y, p.name);
+  }
+
   for (let eIdx = 0; eIdx < result.edges.length; eIdx++) {
     const e = result.edges[eIdx];
     const pts = e.points && e.points.length > 1 ? e.points : null;

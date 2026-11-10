@@ -36,14 +36,14 @@
 
 ## Milestones
 
-| #   | Name                                                      | Scope                                                                                                                                                          | Dependencies    | Status      |
-| --- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ----------- |
-| M1  | R1 Error Resolution & Build Stability                     | Ambient typing in `src/vite-env.d.ts`, tagline alignment in `connect.test.tsx`, format check, verifying `npm run check`, `npm test`, `npm run build` pass 100% | none            | DONE        |
-| M2  | R2 In-Browser HEIC Upload & Privacy                       | `heic2any` integration, `.heic`/`.heif` file input handling, local blob conversion, `.gitignore` privacy safeguards, automated unit/integration tests          | M1              | IN_PROGRESS |
-| M3  | R4 Visitor Interactivity & Guided Walkthrough             | `src/tour/` component, 7-step guided navigation tour, App.tsx integration, design token compliance (`#058C42`, glass panels), unit tests                       | M1              | PLANNED     |
-| M4  | R3 Repository Presentation Upgrade                        | Professional `README.md` showcase, `VALIDATION.md` updates, DX docs, verification command matrix, privacy assurances                                           | M1, M2, M3      | PLANNED     |
-| E2E | E2E Testing Track                                         | Requirement-driven opaque-box test suite (Tiers 1-4: Feature, Boundary, Combinatorial, Workload) -> `TEST_READY.md`                                            | M1              | PLANNED     |
-| M5  | Final Milestone: E2E Verification & Adversarial Hardening | Phase 1: Pass 100% of E2E test suite (Tiers 1-4). Phase 2: Adversarial coverage hardening (Tier 5)                                                             | M2, M3, M4, E2E | PLANNED     |
+| #   | Name                                                      | Scope                                                                                                                                                          | Dependencies    | Status  |
+| --- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ------- |
+| M1  | R1 Error Resolution & Build Stability                     | Ambient typing in `src/vite-env.d.ts`, tagline alignment in `connect.test.tsx`, format check, verifying `npm run check`, `npm test`, `npm run build` pass 100% | none            | DONE    |
+| M2  | R2 In-Browser HEIC Upload & Privacy                       | `heic2any` integration, `.heic`/`.heif` file input handling, local blob conversion, `.gitignore` privacy safeguards, automated unit/integration tests          | M1              | DONE    |
+| M3  | R4 Visitor Interactivity & Guided Walkthrough             | `src/tour/` component, 7-step guided navigation tour, App.tsx integration, design token compliance (`#058C42`, glass panels), unit tests                       | M1              | PLANNED |
+| M4  | R3 Repository Presentation Upgrade                        | Professional `README.md` showcase, `VALIDATION.md` updates, DX docs, verification command matrix, privacy assurances                                           | M1, M2, M3      | PLANNED |
+| E2E | E2E Testing Track                                         | Requirement-driven opaque-box test suite (Tiers 1-4: Feature, Boundary, Combinatorial, Workload) -> `TEST_READY.md`                                            | M1              | PLANNED |
+| M5  | Final Milestone: E2E Verification & Adversarial Hardening | Phase 1: Pass 100% of E2E test suite (Tiers 1-4). Phase 2: Adversarial coverage hardening (Tier 5)                                                             | M2, M3, M4, E2E | PLANNED |
 
 ## Interface Contracts
 

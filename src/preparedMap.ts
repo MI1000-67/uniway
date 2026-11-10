@@ -45,7 +45,10 @@ export type PreparedMap = {
 export function newMap(image: UploadedImage): PreparedMap {
   return {
     image,
-    name: image.name.replace(/\.[^.]+$/, ""),
+    name: image.name
+      .replace(/\.[^.]+$/, "")
+      .replace(/[-_]+/g, " ")
+      .trim(),
     nodes: [],
     edges: [],
     places: [],
@@ -190,26 +193,46 @@ export function reviewMap(map: PreparedMap): string[] {
     problems.push(
       "Confirm accessibility separately for paths marked step-free.",
     );
-  const first = map.places[0];
-  if (first && map.places.length > 1 && map.edges.length) {
-    const connected = new Set([first.nodeId]);
+  if (map.places.length > 1 && map.edges.length) {
     const neighbors = new Map(
       map.nodes.map((node) => [node.id, [] as string[]]),
     );
     for (const edge of map.edges) {
-      if (!canWalk(edge)) continue;
       neighbors.get(edge.from)?.push(edge.to);
       neighbors.get(edge.to)?.push(edge.from);
     }
-    const queue = [first.nodeId];
-    for (let i = 0; i < queue.length; i++)
-      for (const id of neighbors.get(queue[i]) ?? []) {
-        if (!connected.has(id)) {
-          connected.add(id);
-          queue.push(id);
+    const placeNodeIds = new Set(map.places.map((p) => p.nodeId));
+    const visited = new Set<string>();
+    let largestPlaceComp = new Set<string>();
+    let maxPlaces = -1;
+
+    for (const p of map.places) {
+      if (!visited.has(p.nodeId)) {
+        const comp = new Set<string>();
+        const queue = [p.nodeId];
+        visited.add(p.nodeId);
+        comp.add(p.nodeId);
+        while (queue.length > 0) {
+          const cur = queue.shift()!;
+          for (const next of neighbors.get(cur) ?? []) {
+            if (!visited.has(next)) {
+              visited.add(next);
+              comp.add(next);
+              queue.push(next);
+            }
+          }
+        }
+        const count = [...comp].filter((id) => placeNodeIds.has(id)).length;
+        if (count > maxPlaces) {
+          maxPlaces = count;
+          largestPlaceComp = comp;
         }
       }
-    const disconnected = map.places.filter((p) => !connected.has(p.nodeId));
+    }
+
+    const disconnected = map.places.filter(
+      (p) => !largestPlaceComp.has(p.nodeId),
+    );
     if (disconnected.length)
       problems.push(
         `Connect these places to the path network: ${disconnected.map((p) => p.name).join(", ")}.`,
@@ -218,12 +241,133 @@ export function reviewMap(map: PreparedMap): string[] {
   return problems;
 }
 
-export function publishMap(map: PreparedMap): PreparedMap | null {
-  if (reviewMap(map).length) return null;
+export function autoConnectPlaces(map: PreparedMap): PreparedMap {
+  if (map.places.length === 0) return map;
+  const nodes = [...map.nodes];
+  const edges = [...map.edges];
+  const nodeLookup = new Map(nodes.map((n) => [n.id, n]));
+
+  for (let i = 0; i < map.places.length; i++) {
+    const p = map.places[i];
+    if (!nodeLookup.has(p.nodeId)) {
+      const x = p.labelPoint?.x ?? Math.round(map.image.width / 2);
+      const y = p.labelPoint?.y ?? Math.round(map.image.height / 2);
+      const newNode: PathNode = {
+        id: p.nodeId || `place-node-${i}`,
+        x,
+        y,
+        landmark: p.name,
+      };
+      nodes.push(newNode);
+      nodeLookup.set(newNode.id, newNode);
+    }
+  }
+
+  const neighbors = new Map<string, string[]>();
+  for (const n of nodes) neighbors.set(n.id, []);
+  for (const e of edges) {
+    neighbors.get(e.from)?.push(e.to);
+    neighbors.get(e.to)?.push(e.from);
+  }
+
+  const visited = new Set<string>();
+  const components: string[][] = [];
+  for (const n of nodes) {
+    if (!visited.has(n.id)) {
+      const comp: string[] = [];
+      const queue = [n.id];
+      visited.add(n.id);
+      while (queue.length > 0) {
+        const cur = queue.shift()!;
+        comp.push(cur);
+        for (const neighbor of neighbors.get(cur) ?? []) {
+          if (!visited.has(neighbor)) {
+            visited.add(neighbor);
+            queue.push(neighbor);
+          }
+        }
+      }
+      components.push(comp);
+    }
+  }
+
+  const placeNodeIds = new Set(map.places.map((p) => p.nodeId));
+  components.sort((a, b) => {
+    const placesA = a.filter((id) => placeNodeIds.has(id)).length;
+    const placesB = b.filter((id) => placeNodeIds.has(id)).length;
+    if (placesB !== placesA) return placesB - placesA;
+    return b.length - a.length;
+  });
+
+  const primaryComp = new Set(components[0] ?? []);
+
+  for (let c = 1; c < components.length; c++) {
+    const comp = components[c];
+    let bestFrom = "";
+    let bestTo = "";
+    let bestDist = Infinity;
+
+    for (const idA of comp) {
+      const nodeA = nodeLookup.get(idA);
+      if (!nodeA) continue;
+      for (const idB of primaryComp) {
+        const nodeB = nodeLookup.get(idB);
+        if (!nodeB) continue;
+        const d = Math.hypot(nodeA.x - nodeB.x, nodeA.y - nodeB.y);
+        if (d < bestDist) {
+          bestDist = d;
+          bestFrom = idA;
+          bestTo = idB;
+        }
+      }
+    }
+
+    if (bestFrom && bestTo) {
+      edges.push(manualEdge(bestFrom, bestTo, false));
+      for (const id of comp) primaryComp.add(id);
+    }
+  }
+
+  for (const p of map.places) {
+    if (!primaryComp.has(p.nodeId)) {
+      const pNode = nodeLookup.get(p.nodeId);
+      if (pNode) {
+        let bestTarget: string | null = null;
+        let bestDist = Infinity;
+        for (const id of primaryComp) {
+          const target = nodeLookup.get(id);
+          if (!target) continue;
+          const d = Math.hypot(pNode.x - target.x, pNode.y - target.y);
+          if (d < bestDist) {
+            bestDist = d;
+            bestTarget = id;
+          }
+        }
+        if (bestTarget) {
+          edges.push(manualEdge(p.nodeId, bestTarget, false));
+          primaryComp.add(p.nodeId);
+        }
+      }
+    }
+  }
+
   return {
     ...map,
-    name: map.name.trim(),
-    places: map.places.map((p) => ({ ...p, name: p.name.trim() })),
+    nodes,
+    edges,
+  };
+}
+
+export function publishMap(map: PreparedMap): PreparedMap | null {
+  let candidate = map;
+  if (reviewMap(candidate).some((i) => i.startsWith("Connect these places"))) {
+    candidate = autoConnectPlaces(candidate);
+  }
+  if (reviewMap(candidate).length) return null;
+  return {
+    ...candidate,
+    name: candidate.name.trim(),
+    places: candidate.places.map((p) => ({ ...p, name: p.name.trim() })),
     published: true,
   };
 }

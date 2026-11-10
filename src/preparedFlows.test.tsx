@@ -324,4 +324,77 @@ describe("guided map preparation", () => {
       screen.getByRole("button", { name: "Collapse sidebar" }),
     ).toBeTruthy();
   });
+  it("allows confirming all detected paths as walkable in bulk to unlock the interactive map", () => {
+    const publish = vi.fn();
+    function Harness() {
+      const [map, setMap] = useState({
+        ...fixture,
+        edges: [detectedEdge({ from: "gate", to: "library", stepFree: false })],
+      });
+      return (
+        <MapEditor
+          map={map}
+          onChange={setMap}
+          onPublish={publish}
+          onBack={vi.fn()}
+        />
+      );
+    }
+    render(<Harness />);
+    fireEvent.click(screen.getByLabelText(/I’ve checked/));
+    const publishBtn = screen.getByRole("button", {
+      name: "Open interactive map",
+    }) as HTMLButtonElement;
+    expect(publishBtn.disabled).toBe(true);
+    expect(
+      screen.getByText(/Review pedestrian access for 1 path segment/),
+    ).toBeTruthy();
+
+    const confirmAllBtn = screen.getAllByRole("button", {
+      name: /Confirm all.*walkable/i,
+    })[0];
+    fireEvent.click(confirmAllBtn);
+
+    expect(
+      screen.queryByText(/Review pedestrian access for 1 path segment/),
+    ).toBeNull();
+    expect(publishBtn.disabled).toBe(false);
+    fireEvent.click(publishBtn);
+    expect(publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        published: true,
+        edges: [
+          expect.objectContaining({
+            origin: "detected",
+            stepFree: false,
+            review: { pedestrian: true, accessibility: false },
+          }),
+        ],
+      }),
+    );
+  });
+  it("allows one-click adding second place when only one place exists", () => {
+    function Harness() {
+      const [map, setMap] = useState<PreparedMap>({
+        ...fixture,
+        places: [fixture.places[0]],
+        edges: [],
+      });
+      return (
+        <MapEditor
+          map={map}
+          onChange={setMap}
+          onPublish={vi.fn()}
+          onBack={vi.fn()}
+        />
+      );
+    }
+    render(<Harness />);
+    expect(screen.getByText(/Add at least two named places/)).toBeTruthy();
+    const addPlaceBtn = screen.getByRole("button", {
+      name: /Add a second place marker/i,
+    });
+    fireEvent.click(addPlaceBtn);
+    expect(screen.queryByText(/Add at least two named places/)).toBeNull();
+  });
 });

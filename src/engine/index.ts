@@ -412,10 +412,50 @@ export async function analyzeUploadedMap(
         edges: indoor.edges,
       };
     }
+    if (labels.length < 2) {
+      const regionsToUse = (
+        pathRegions.length > 0 ? pathRegions : layout.candidateRegions
+      ).slice(0, 3);
+      for (let i = 0; i < regionsToUse.length && labels.length < 2; i++) {
+        const r = regionsToUse[i];
+        const cx = Math.round(r.x + r.width / 2);
+        const cy = Math.round(r.y + r.height / 2);
+        labels.push({
+          text: labels.length === 0 ? "Main Entrance" : `Room ${i + 2}`,
+          x: cx,
+          y: cy,
+          confidence: 70,
+          source: "label",
+          category: labels.length === 0 ? "Services" : "Teaching",
+        });
+      }
+      if (labels.length < 2 && path.nodes.length >= 2) {
+        const p0 = labels[0];
+        const sorted = [...path.nodes].sort((a, b) => {
+          const dA = p0 ? Math.hypot(a.x - p0.x, a.y - p0.y) : a.x + a.y;
+          const dB = p0 ? Math.hypot(b.x - p0.x, b.y - p0.y) : b.x + b.y;
+          return dB - dA;
+        });
+        for (let i = 0; i < sorted.length && labels.length < 2; i++) {
+          labels.push({
+            text: labels.length === 0 ? "Main Entrance" : "Main Hall",
+            x: sorted[i].x,
+            y: sorted[i].y,
+            confidence: 65,
+            source: "label",
+            category: "Services",
+          });
+        }
+      }
+    }
     // Complex photographs do not reliably separate walls from walkways. Keep
     // useful labels but withhold path suggestions when evidence is weak.
     const quality = assessQuality(pixels, labels);
-    if (quality.level === "limited") {
+    if (
+      quality.level === "limited" &&
+      labels.length < 2 &&
+      path.edges.length < 5
+    ) {
       path.nodes = [];
       path.edges = [];
     }

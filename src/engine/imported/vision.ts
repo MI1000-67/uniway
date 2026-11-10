@@ -282,48 +282,75 @@ export function connectPlace(
     }
   }
 
-  if (!nearestEdge || !nearestPoint || distance > 120) return false;
-  const targetPoint = nearestPoint;
-  const close = graph.junctions.find(
-    (j) => Math.hypot(j.x - targetPoint.x, j.y - targetPoint.y) < 2,
-  );
-  let id = close?.id;
-  if (!id) {
-    id = `f${floor}-j${graph.junctions.length}`;
-    graph.junctions.push({
-      id,
-      x: targetPoint.x,
-      y: targetPoint.y,
-      floor,
-      name: "Path junction",
-      category: "Services",
-      icon: "pin",
-      description: "",
-    });
-    graph.edges.splice(
-      nearestEdgeIndex,
-      1,
-      {
-        ...nearestEdge,
-        b: id,
-        points: [...nearestEdge.points.slice(0, nearestSegment), targetPoint],
-      },
-      {
-        ...nearestEdge,
-        a: id,
-        points: [targetPoint, ...nearestEdge.points.slice(nearestSegment)],
-      },
-    );
+  // Also check direct distance to existing junctions
+  let nearestJunction: VisionJunction | null = null;
+  let junctionDistance = Infinity;
+  for (const j of graph.junctions) {
+    const d = Math.hypot(j.x - place.x, j.y - place.y);
+    if (d < junctionDistance) {
+      junctionDistance = d;
+      nearestJunction = j;
+    }
   }
-  graph.edges.push({
-    a: place.id,
-    b: id,
-    points: [{ x: place.x, y: place.y }, targetPoint],
-    accessible: false,
-    confirmed: false,
-    source: "detected",
-  });
-  return true;
+
+  const maxDist = 320;
+  if (nearestEdge && nearestPoint && distance <= maxDist) {
+    const targetPoint = nearestPoint;
+    const close = graph.junctions.find(
+      (j) => Math.hypot(j.x - targetPoint.x, j.y - targetPoint.y) < 2,
+    );
+    let id = close?.id;
+    if (!id) {
+      id = `f${floor}-j${graph.junctions.length}`;
+      graph.junctions.push({
+        id,
+        x: targetPoint.x,
+        y: targetPoint.y,
+        floor,
+        name: "Path junction",
+        category: "Services",
+        icon: "pin",
+        description: "",
+      });
+      graph.edges.splice(
+        nearestEdgeIndex,
+        1,
+        {
+          ...nearestEdge,
+          b: id,
+          points: [...nearestEdge.points.slice(0, nearestSegment), targetPoint],
+        },
+        {
+          ...nearestEdge,
+          a: id,
+          points: [targetPoint, ...nearestEdge.points.slice(nearestSegment)],
+        },
+      );
+    }
+    graph.edges.push({
+      a: place.id,
+      b: id,
+      points: [{ x: place.x, y: place.y }, targetPoint],
+      accessible: false,
+      confirmed: false,
+      source: "detected",
+    });
+    return true;
+  } else if (nearestJunction && junctionDistance <= 450) {
+    graph.edges.push({
+      a: place.id,
+      b: nearestJunction.id,
+      points: [
+        { x: place.x, y: place.y },
+        { x: nearestJunction.x, y: nearestJunction.y },
+      ],
+      accessible: false,
+      confirmed: false,
+      source: "detected",
+    });
+    return true;
+  }
+  return false;
 }
 
 export function categoryForName(name: string): {
@@ -908,6 +935,10 @@ export function analyzeRaster({
       .slice(0, 160);
     const activeIds = new Set(graph.edges.flatMap((e) => [e.a, e.b]));
     graph.junctions = graph.junctions.filter((j) => activeIds.has(j.id));
+  }
+
+  for (const place of places) {
+    connectPlace(place, graph, floor);
   }
 
   const warnings: string[] = [];

@@ -19,6 +19,7 @@ import {
   reviewMap,
   reviewConnection,
   publishMap,
+  autoConnectPlaces,
 } from "./preparedMap";
 import type { PreparedMap } from "./preparedMap";
 import ImageMapCanvas from "./ImageMapCanvas";
@@ -50,6 +51,87 @@ export default function MapEditor({
   const [showRegions, setShowRegions] = useState(false);
   const current = map.places.find((p) => p.nodeId === active);
   const issues = reviewMap(map);
+  const unreviewedCount = map.edges.filter((e) => !e.review?.pedestrian).length;
+  function confirmAllWalkable() {
+    setHistory((h) => [...h.slice(-39), map]);
+    onChange({
+      ...map,
+      published: false,
+      edges: map.edges.map((e) =>
+        !e.review?.pedestrian
+          ? {
+              ...e,
+              review: {
+                pedestrian: true,
+                accessibility: e.review?.accessibility ?? false,
+              },
+            }
+          : e,
+      ),
+    });
+  }
+  function addSuggestedPlace() {
+    const usedNodeIds = new Set(map.places.map((p) => p.nodeId));
+    let targetNode:
+      { id: string; x: number; y: number; landmark: string } | undefined;
+    if (map.places.length > 0) {
+      const p0Node = map.nodes.find((n) => n.id === map.places[0].nodeId);
+      let bestDist = -1;
+      for (const n of map.nodes) {
+        if (usedNodeIds.has(n.id)) continue;
+        const d = p0Node
+          ? Math.hypot(n.x - p0Node.x, n.y - p0Node.y)
+          : n.x + n.y;
+        if (d > bestDist) {
+          bestDist = d;
+          targetNode = n;
+        }
+      }
+    }
+    if (!targetNode && map.nodes.length > 0) {
+      targetNode =
+        map.nodes.find((n) => !usedNodeIds.has(n.id)) ??
+        map.nodes[map.nodes.length - 1];
+    }
+    const placeX = targetNode
+      ? targetNode.x
+      : Math.round(map.image.width * 0.7);
+    const placeY = targetNode
+      ? targetNode.y
+      : Math.round(map.image.height * 0.5);
+    const placeNodeId = targetNode
+      ? targetNode.id
+      : `place-node-${map.places.length}`;
+    const newNodes = targetNode
+      ? map.nodes
+      : [
+          ...map.nodes,
+          {
+            id: placeNodeId,
+            x: placeX,
+            y: placeY,
+            landmark: "Entrance / Room",
+          },
+        ];
+    const placeName =
+      map.places.length === 0
+        ? "Main Entrance"
+        : `Room ${map.places.length + 1}`;
+    const newPlace = {
+      id: `place-${Date.now()}-${map.places.length}`,
+      nodeId: placeNodeId,
+      name: placeName,
+      category: "Teaching" as Category,
+      entrance: map.places.length === 0,
+      labelPoint: { x: placeX, y: placeY },
+    };
+    change({
+      ...map,
+      nodes: newNodes,
+      places: [...map.places, newPlace],
+    });
+    setActive(placeNodeId);
+  }
   function change(next: PreparedMap) {
     setHistory((h) => [...h.slice(-39), map]);
     setReviewed(false);
@@ -599,22 +681,104 @@ export default function MapEditor({
       <div className="editor-review">
         <div>
           <h4>Ready to navigate?</h4>
-          {map.edges.some((edge) => !edge.review.pedestrian) && (
-            <button
-              className="secondary-button"
-              onClick={() => {
-                const edge = map.edges.find((e) => !e.review.pedestrian)!;
-                chooseTool("pan");
-                setActive(edge.from);
+          {(unreviewedCount > 0 ||
+            issues.some((i) => i.startsWith("Connect these places"))) && (
+            <div
+              className="editor-review-actions"
+              style={{
+                display: "flex",
+                gap: "8px",
+                flexWrap: "wrap",
+                marginBottom: "12px",
               }}
             >
-              Review next path
-            </button>
+              {unreviewedCount > 0 && (
+                <>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => {
+                      const edge = map.edges.find(
+                        (e) => !e.review?.pedestrian,
+                      )!;
+                      chooseTool("pan");
+                      setActive(edge.from);
+                    }}
+                  >
+                    Review next path
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={confirmAllWalkable}
+                  >
+                    Confirm all paths walkable
+                  </button>
+                </>
+              )}
+              {issues.some((i) => i.startsWith("Connect these places")) && (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => change(autoConnectPlaces(map))}
+                >
+                  Connect all places to paths
+                </button>
+              )}
+            </div>
           )}
           {!!issues.length && (
             <ul>
               {issues.map((issue) => (
-                <li key={issue}>{issue}</li>
+                <li key={issue}>
+                  {issue}
+                  {issue.startsWith("Review pedestrian access") &&
+                    unreviewedCount > 0 && (
+                      <button
+                        type="button"
+                        className="text-button inline-confirm"
+                        style={{
+                          marginLeft: "8px",
+                          fontWeight: "600",
+                          textDecoration: "underline",
+                          cursor: "pointer",
+                        }}
+                        onClick={confirmAllWalkable}
+                      >
+                        Confirm all {unreviewedCount} paths as walkable
+                      </button>
+                    )}
+                  {issue.startsWith("Connect these places") && (
+                    <button
+                      type="button"
+                      className="text-button inline-confirm"
+                      style={{
+                        marginLeft: "8px",
+                        fontWeight: "600",
+                        textDecoration: "underline",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => change(autoConnectPlaces(map))}
+                    >
+                      Connect all places to paths automatically
+                    </button>
+                  )}
+                  {issue.startsWith("Add at least two named places") && (
+                    <button
+                      type="button"
+                      className="text-button inline-confirm"
+                      style={{
+                        marginLeft: "8px",
+                        fontWeight: "600",
+                        textDecoration: "underline",
+                        cursor: "pointer",
+                      }}
+                      onClick={addSuggestedPlace}
+                    >
+                      Add a second place marker
+                    </button>
+                  )}
+                </li>
               ))}
             </ul>
           )}
@@ -638,17 +802,58 @@ export default function MapEditor({
               I’ve checked that the marked places and paths match this map.
             </span>
           </label>
+          {reviewed && unreviewedCount > 0 && (
+            <div
+              className="review-unreviewed-prompt"
+              style={{
+                marginTop: "12px",
+                marginBottom: "8px",
+                padding: "10px 14px",
+                background: "rgba(5, 140, 66, 0.08)",
+                border: "1px solid rgba(5, 140, 66, 0.25)",
+                borderRadius: "8px",
+              }}
+            >
+              <p
+                className="small-copy"
+                style={{ margin: "0 0 8px 0", color: "var(--foreground)" }}
+              >
+                Confirm pedestrian access for {unreviewedCount} detected path
+                segment
+                {unreviewedCount === 1 ? "" : "s"} to enable the interactive
+                map.
+              </p>
+              <button
+                type="button"
+                className="secondary-button full-width"
+                onClick={confirmAllWalkable}
+              >
+                Confirm all {unreviewedCount} paths as walkable
+              </button>
+            </div>
+          )}
         </div>
-        <button
-          className="primary-button"
-          disabled={!!issues.length || !namesValid || !reviewed}
-          onClick={() => {
-            const ready = reviewed ? publishMap(map) : null;
-            if (ready) onPublish(ready);
-          }}
-        >
-          Open interactive map <ArrowRight size={17} />
-        </button>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          {onPreview && (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => onPreview(map)}
+            >
+              Preview draft
+            </button>
+          )}
+          <button
+            className="primary-button"
+            disabled={!!issues.length || !namesValid || !reviewed}
+            onClick={() => {
+              const ready = reviewed ? publishMap(map) : null;
+              if (ready) onPublish(ready);
+            }}
+          >
+            Open interactive map <ArrowRight size={17} />
+          </button>
+        </div>
       </div>
       <p className="editor-footnote">
         Your image and map stay in this open tab. Suggested paths need a visual
