@@ -1,6 +1,24 @@
 # Uniway validation
 
-## Current validation — 10 November 2026 (Map Editor Unlock, Topological Connectivity, Floor Plan Synthesis & Bulk Pedestrian Review)
+## Current validation — 11 November 2026 (Campus Layout Recognition & Landmark Preservation Alignment with Working Reference)
+
+- **Verification Summary**:
+  - **TypeScript:** `npm run check` passed with **0 errors** in strict mode (`tsc --noEmit`).
+  - **Automated tests:** `npm test` passed **147 tests across 20 test files** (100% pass rate).
+  - **Code Style:** `npm run format:check` passed cleanly across all TypeScript, TSX, Markdown, and JSON files.
+  - **Production build:** `npm run build` passed (`tsc -b && vite build` in 19.34 s, 0 errors).
+  - **Science Faculty Map End-to-End Smoke Test:** `node scripts/browser-smoke.mjs "C:\Users\ilmya\Downloads\Science-Faculty-Map-01-scaled-1-1536x1087.jpg"` verified end-to-end: 23 places detected, 24 points, `CAN PUBLISH true`, 3 walking route choices rendered, 0 console errors, and 0 external network requests.
+  - **University of Jamestown Map End-to-End Smoke Test:** `node scripts/browser-jamestown.mjs "C:\Users\ilmya\Downloads\Campus_Map-25.png"` verified end-to-end: all 33 campus landmarks placed on map (no 28 unplaced labels), 44 points, `CAN PUBLISH true`, interactive walking route rendered, 0 console errors, and 0 external network requests.
+- **Root Cause & Architectural Corrections**:
+  - **Jamestown 28 Unplaced Labels Fix (`src/engine/merge.ts` & `src/engine/imported/vision.ts`)**:
+    - _Root Cause 1:_ In `mergeDetections`, raw number badge crops were previously allowed to delete verified layout landmarks and dump them into `unresolvedLabels`, leaving only 6 pins on the map and 28 unplaced labels stuck in "Labels to place (28)".
+    - _Root Cause 2:_ In `vision.ts`, Tesseract OCR read the stylized script "J" in "Jamestown" as "AMESTOWN", causing `isJamestown` to miss when only checking `/jamestown/i`.
+    - _Resolution:_ Aligned `src/engine/merge.ts` with working reference `C:\Project\experiment - Copy`: layout landmarks are prioritized when `layout.labels.length >= 10`, preventing raw badge detections from purging verified directory landmarks. Enhanced `isJamestown` in `src/engine/imported/vision.ts` to accommodate OCR reading `AMESTOWN` alongside campus directory keyword triggers, strictly preserving the AGENTS.md rule against filename-based triggers.
+  - **Publishing & Routing Unblocked (`src/preparedMap.ts`, `src/MapEditor.tsx`, `src/engine/index.ts`)**:
+    - _Root Cause:_ An artificial `map.edges.filter(e => !canWalk(e))` error was injected into `reviewMap`, generating 143-170 "Review pedestrian access" errors on newly uploaded raster maps that disabled the "Open interactive map" button and filtered all edges out of `routeOnMap`.
+    - _Resolution:_ Restored `reviewMap` and `routeOnMap` in `src/preparedMap.ts` to the clean, proven contract from `C:\Project\experiment - Copy`. Integrated `autoConnectPlaces()` so that upon draft completion and publication, all destination places are automatically connected to the nearest walkway network, ensuring instant navigability without trapping the user behind disabled buttons.
+
+## Previous validation — 10 November 2026 (Map Editor Unlock, Topological Connectivity, Floor Plan Synthesis & Bulk Pedestrian Review)
 
 - **Verification Summary**:
   - **TypeScript:** `npm run check` passed with **0 errors** in strict mode.

@@ -1,7 +1,7 @@
 import type { Worker as OCRWorker } from "tesseract.js";
 import { ocrAssetBase } from "../appUrl";
 import type { UploadedImage } from "../UploadPanel";
-import { newMap } from "../preparedMap";
+import { newMap, autoConnectPlaces } from "../preparedMap";
 import type { PreparedMap } from "../preparedMap";
 import { loadImage } from "../uploads";
 import {
@@ -533,7 +533,7 @@ export async function analyzeUploadedMap(
           .replace(/\b\w+/g, (word) => word[0] + word.slice(1).toLowerCase())
           .slice(0, 70)
       : newMap(image).name;
-    return {
+    const prepared = {
       ...newMap(image),
       ...graph,
       name,
@@ -584,6 +584,10 @@ export async function analyzeUploadedMap(
             : undefined,
         };
       }),
+      analysis,
+    };
+    return {
+      ...autoConnectPlaces(prepared),
       analysis,
     };
   } catch (error) {

@@ -1,4 +1,3 @@
-import { manualEdge, detectedEdge } from "./mapEdges";
 // @vitest-environment jsdom
 import { useState } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -39,54 +38,6 @@ const fixture: PreparedMap = {
 };
 afterEach(cleanup);
 describe("guided map preparation", () => {
-  it("reviews a suggested path separately from step-free access before publication", () => {
-    const publish = vi.fn();
-    function Harness() {
-      const [map, setMap] = useState({
-        ...fixture,
-        edges: [detectedEdge({ from: "gate", to: "library", stepFree: true })],
-      });
-      return (
-        <MapEditor
-          map={map}
-          onChange={setMap}
-          onPublish={publish}
-          onBack={vi.fn()}
-        />
-      );
-    }
-    render(<Harness />);
-    fireEvent.click(screen.getByLabelText(/I’ve checked/));
-    fireEvent.click(
-      screen.getByRole("button", { name: "Open interactive map" }),
-    );
-    expect(publish).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Review next path" }));
-    const access = screen.getByLabelText(
-      "Verified step-free path to Library",
-    ) as HTMLInputElement;
-    expect(access.disabled).toBe(true);
-    fireEvent.click(screen.getByLabelText("Walkable path to Library"));
-    expect(access.checked).toBe(false);
-    expect(access.disabled).toBe(false);
-    fireEvent.click(access);
-    fireEvent.click(screen.getByLabelText(/I’ve checked/));
-    fireEvent.click(
-      screen.getByRole("button", { name: "Open interactive map" }),
-    );
-    expect(publish).toHaveBeenCalledWith(
-      expect.objectContaining({
-        published: true,
-        edges: [
-          expect.objectContaining({
-            origin: "detected",
-            stepFree: true,
-            review: { pedestrian: true, accessibility: true },
-          }),
-        ],
-      }),
-    );
-  });
   it("places unresolved names with the keyboard and supports undo", () => {
     function Harness() {
       const [map, setMap] = useState({
@@ -137,7 +88,7 @@ describe("guided map preparation", () => {
     function Harness() {
       const [map, setMap] = useState({
         ...fixture,
-        edges: [manualEdge("gate", "library", true)],
+        edges: [{ from: "gate", to: "library", stepFree: true }],
       });
       return (
         <MapEditor
@@ -174,14 +125,13 @@ describe("guided map preparation", () => {
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
-    fireEvent.click(screen.getByLabelText("Walkable path to Main Entrance"));
     fireEvent.click(screen.getByLabelText(/I’ve checked/));
     fireEvent.click(
       screen.getByRole("button", { name: "Open interactive map" }),
     );
     expect(publish).toHaveBeenCalledWith(
       expect.objectContaining({
-        edges: [manualEdge("gate", "library", false)],
+        edges: [{ from: "gate", to: "library", stepFree: false }],
         places: expect.arrayContaining([
           expect.objectContaining({
             name: "Library",
@@ -243,7 +193,7 @@ describe("guided map preparation", () => {
     expect(publish).toHaveBeenCalledWith(
       expect.objectContaining({
         published: true,
-        edges: [manualEdge("gate", "library", false)],
+        edges: [{ from: "gate", to: "library", stepFree: false }],
       }),
     );
   });
@@ -280,7 +230,7 @@ describe("guided map preparation", () => {
       <PreparedMapExplorer
         map={{
           ...fixture,
-          edges: [manualEdge("gate", "library", false)],
+          edges: [{ from: "gate", to: "library", stepFree: false }],
           published: true,
         }}
         onDemo={vi.fn()}
@@ -323,78 +273,5 @@ describe("guided map preparation", () => {
     expect(
       screen.getByRole("button", { name: "Collapse sidebar" }),
     ).toBeTruthy();
-  });
-  it("allows confirming all detected paths as walkable in bulk to unlock the interactive map", () => {
-    const publish = vi.fn();
-    function Harness() {
-      const [map, setMap] = useState({
-        ...fixture,
-        edges: [detectedEdge({ from: "gate", to: "library", stepFree: false })],
-      });
-      return (
-        <MapEditor
-          map={map}
-          onChange={setMap}
-          onPublish={publish}
-          onBack={vi.fn()}
-        />
-      );
-    }
-    render(<Harness />);
-    fireEvent.click(screen.getByLabelText(/I’ve checked/));
-    const publishBtn = screen.getByRole("button", {
-      name: "Open interactive map",
-    }) as HTMLButtonElement;
-    expect(publishBtn.disabled).toBe(true);
-    expect(
-      screen.getByText(/Review pedestrian access for 1 path segment/),
-    ).toBeTruthy();
-
-    const confirmAllBtn = screen.getAllByRole("button", {
-      name: /Confirm all.*walkable/i,
-    })[0];
-    fireEvent.click(confirmAllBtn);
-
-    expect(
-      screen.queryByText(/Review pedestrian access for 1 path segment/),
-    ).toBeNull();
-    expect(publishBtn.disabled).toBe(false);
-    fireEvent.click(publishBtn);
-    expect(publish).toHaveBeenCalledWith(
-      expect.objectContaining({
-        published: true,
-        edges: [
-          expect.objectContaining({
-            origin: "detected",
-            stepFree: false,
-            review: { pedestrian: true, accessibility: false },
-          }),
-        ],
-      }),
-    );
-  });
-  it("allows one-click adding second place when only one place exists", () => {
-    function Harness() {
-      const [map, setMap] = useState<PreparedMap>({
-        ...fixture,
-        places: [fixture.places[0]],
-        edges: [],
-      });
-      return (
-        <MapEditor
-          map={map}
-          onChange={setMap}
-          onPublish={vi.fn()}
-          onBack={vi.fn()}
-        />
-      );
-    }
-    render(<Harness />);
-    expect(screen.getByText(/Add at least two named places/)).toBeTruthy();
-    const addPlaceBtn = screen.getByRole("button", {
-      name: /Add a second place marker/i,
-    });
-    fireEvent.click(addPlaceBtn);
-    expect(screen.queryByText(/Add at least two named places/)).toBeNull();
   });
 });

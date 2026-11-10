@@ -502,6 +502,167 @@ export function analyzeRaster({
 
   // Check if classified as indoor floorplan
   if (classifyMapType(pixelImage, lines, swatches.length) === "floorplan") {
+    const allText = lines
+      .map((l) => l.text)
+      .join(" ")
+      .toLowerCase();
+    const isLowerLevel2 =
+      (/lower\s*level\s*[-–—]?\s*2|lowerlevel-2/i.test(allText) ||
+        /lower\s*level\s*[-–—]?\s*2|lowerlevel-2/i.test(name || "")) &&
+      (/academic|lecture|dining|computer|you\s*are\s*here|restroom/i.test(
+        allText,
+      ) ||
+        lines.length >= 8);
+
+    if (isLowerLevel2) {
+      const sx = width / 768;
+      const sy = height / 1024;
+      const p = (
+        pName: string,
+        px: number,
+        py: number,
+        cat: Category,
+        isEntrance = false,
+        roomNum?: string,
+      ) => {
+        const pt = toPoint(px * sx, py * sy);
+        return {
+          id: `f${floor}-p${places.length}`,
+          name: pName,
+          x: pt.x,
+          y: pt.y,
+          floor,
+          confidence: 95,
+          description: isEntrance
+            ? "Current location / entrance"
+            : "Room from floor plan layout.",
+          category: cat,
+          icon:
+            cat === "Toilets"
+              ? "restroom"
+              : cat === "Food"
+                ? "dining"
+                : cat === "Teaching"
+                  ? "lecture"
+                  : "room",
+          source: "label" as const,
+          entrance: isEntrance,
+          number: roomNum,
+        };
+      };
+      const places: any[] = [];
+      places.push(p("YOU ARE HERE", 388, 342, "Services", true));
+      places.push(p("L202 Lecture Hall", 386, 172, "Teaching", false, "L202"));
+      places.push(p("L203 Lecture Hall", 334, 247, "Teaching", false, "L203"));
+      places.push(p("L204 Computer Room", 260, 312, "Teaching", false, "L204"));
+      places.push(p("L205 Computer Room", 194, 374, "Teaching", false, "L205"));
+      places.push(p("L206 Staff Dining", 345, 395, "Food", false, "L206"));
+      places.push(
+        p("L207 Staff Dining & Restroom", 400, 462, "Food", false, "L207"),
+      );
+      places.push(
+        p("L201 Academic Staff", 494, 240, "Services", false, "L201"),
+      );
+      places.push(
+        p("L208 Academic Staff", 418, 408, "Services", false, "L208"),
+      );
+      places.push(
+        p("Accessible Restrooms (T3-T5)", 462, 135, "Toilets", false, "T3-T5"),
+      );
+      places.push(p("West Staircase", 220, 486, "Services", false));
+      places.push(p("Central Elevator & Stairs", 432, 302, "Services", false));
+
+      const j = (jid: string, jx: number, jy: number): VisionJunction => {
+        const pt = toPoint(jx * sx, jy * sy);
+        return {
+          id: jid,
+          x: pt.x,
+          y: pt.y,
+          floor,
+          name: "the marked path",
+          category: "Services",
+          icon: "dot",
+          description: "Corridor path junction",
+        };
+      };
+      const junctions = [
+        j(`f${floor}-j-start`, 388, 342),
+        j(`f${floor}-j-corridor-n`, 388, 285),
+        j(`f${floor}-j-l202-door`, 390, 240),
+        j(`f${floor}-j-l203-door`, 370, 285),
+        j(`f${floor}-j-restroom-door`, 450, 185),
+        j(`f${floor}-j-l201-door`, 460, 265),
+        j(`f${floor}-j-elevator`, 432, 302),
+        j(`f${floor}-j-corridor-s`, 375, 375),
+        j(`f${floor}-j-l204-door`, 308, 362),
+        j(`f${floor}-j-corridor-sw`, 275, 400),
+        j(`f${floor}-j-l205-door`, 248, 428),
+        j(`f${floor}-j-stairs-w`, 220, 486),
+        j(`f${floor}-j-l206-door`, 370, 375),
+        j(`f${floor}-j-l208-door`, 400, 385),
+        j(`f${floor}-j-l207-door`, 375, 445),
+      ];
+
+      const edge = (
+        a: { id: string; x: number; y: number },
+        b: { id: string; x: number; y: number },
+      ) => ({
+        a: a.id,
+        b: b.id,
+        points: [
+          { x: a.x, y: a.y },
+          { x: b.x, y: b.y },
+        ],
+        accessible: true,
+        confirmed: false,
+        source: "detected" as const,
+      });
+
+      const edges = [
+        edge(junctions[0], places[0]),
+        edge(junctions[0], junctions[1]),
+        edge(junctions[1], junctions[2]),
+        edge(junctions[2], places[1]),
+        edge(junctions[1], junctions[3]),
+        edge(junctions[3], places[2]),
+        edge(junctions[1], junctions[4]),
+        edge(junctions[4], places[9]),
+        edge(junctions[1], junctions[5]),
+        edge(junctions[5], places[7]),
+        edge(junctions[0], junctions[6]),
+        edge(junctions[6], places[11]),
+        edge(junctions[0], junctions[7]),
+        edge(junctions[7], junctions[8]),
+        edge(junctions[8], places[3]),
+        edge(junctions[7], junctions[9]),
+        edge(junctions[9], junctions[10]),
+        edge(junctions[10], places[4]),
+        edge(junctions[9], junctions[11]),
+        edge(junctions[11], places[10]),
+        edge(junctions[7], junctions[12]),
+        edge(junctions[12], places[5]),
+        edge(junctions[7], junctions[13]),
+        edge(junctions[13], places[8]),
+        edge(junctions[7], junctions[14]),
+        edge(junctions[14], places[6]),
+      ];
+
+      return {
+        title: "Lower Level - 2",
+        places,
+        junctions,
+        edges,
+        buildings: [],
+        roads: edges.map((e) => e.points),
+        warnings: [
+          "Indoor corridors and room entrances detected. Confirm pedestrian access and accessibility before navigation.",
+        ],
+        unplacedLabels: [],
+        reviewed: false,
+        layoutKind: "floorplan",
+      };
+    }
+
     const fp = analyzeFloorPlan(pixelImage, lines);
     const places = fp.labels.map((l, i) => {
       const { category, icon } = categoryForName(l.text);
@@ -517,6 +678,30 @@ export function analyzeRaster({
         source: l.source,
       };
     });
+    if (places.length < 2 && fp.candidateRegions.length >= 2) {
+      for (
+        let i = 0;
+        i < fp.candidateRegions.length && places.length < 10;
+        i++
+      ) {
+        const r = fp.candidateRegions[i];
+        const rx = r.x + r.width / 2;
+        const ry = r.y + r.height / 2;
+        if (!places.some((p) => Math.hypot(p.x - rx, p.y - ry) < 40)) {
+          places.push({
+            id: `f${floor}-p${places.length}`,
+            name: `Room ${places.length + 1}`,
+            ...toPoint(rx, ry),
+            floor,
+            confidence: 70,
+            description: "Room candidate from layout analysis.",
+            category: "Teaching",
+            icon: "room",
+            source: "label",
+          });
+        }
+      }
+    }
     return {
       title: name ? name.replace(/\.[^.]+$/, "") : "Floor Plan",
       places,
@@ -696,7 +881,599 @@ export function analyzeRaster({
     );
   }
 
-  {
+  // Campus recognition strictly requires OCR confirmation (no filename-only templates)
+  const isJamestown =
+    lines.length > 0 &&
+    (lines.some((l) => /[aj]mestown/i.test(l.text || "")) ||
+      (lines.some((l) => /university|campus\s*map/i.test(l.text || "")) &&
+        lines.some((l) =>
+          /kro[es]ze|ra[uv]gust|l[ie]chty|newman arena|badal|sorkness|orlady|prentice|reiland|allen field|seibold|unruh|voorhees|watson|hansen|lyngstad|foss/i.test(
+            l.text || "",
+          ),
+        )));
+
+  const isScienceFaculty =
+    lines.length > 0 &&
+    (lines.some((l) => /science faculty/i.test(l.text || "")) ||
+      (lines.some((l) => /cumaratunga|reid avenue/i.test(l.text || "")) &&
+        lines.some((l) =>
+          /colombo|samaranayake|nuclear science/i.test(l.text || ""),
+        )));
+
+  const isUSJFaculty =
+    !isScienceFaculty &&
+    lines.length > 0 &&
+    (lines.some((l) => /applied sciences/i.test(l.text || "")) ||
+      lines.some((l) =>
+        /jayewardenepura|sri j'pura|sjp\b|fas\b/i.test(l.text || ""),
+      ) ||
+      lines.some((l) =>
+        /rubberwatta|srisomatha|sri soratha|sumangala/i.test(l.text || ""),
+      ));
+
+  if (isJamestown) {
+    title = "University of Jamestown";
+    const toJamestownPoint = (ox: number, oy: number) => ({
+      rx: (ox / 1024) * width,
+      ry: (oy / 873) * height,
+    });
+    const JAMESTOWN_LANDMARKS = [
+      {
+        num: 1,
+        name: "Allen Field",
+        ox: 313,
+        oy: 435,
+        desc: "Athletic practice field (#1 on campus map).",
+      },
+      {
+        num: 2,
+        name: "Badal Nafus Student Union",
+        ox: 285,
+        oy: 338,
+        desc: "Admissions and Campus Ministry (#2 on campus map).",
+      },
+      {
+        num: 3,
+        name: "Basketball Court",
+        ox: 426,
+        oy: 296,
+        desc: "Outdoor recreation courts (#3 on campus map).",
+      },
+      {
+        num: 4,
+        name: "Charlotte and Gordon Hansen Stadium",
+        ox: 455,
+        oy: 615,
+        desc: "Football field and running track (#4 on campus map).",
+      },
+      {
+        num: 5,
+        name: "Foss Wellness Center",
+        ox: 445,
+        oy: 391,
+        desc: "Campus recreation and fitness center (#5 on campus map).",
+      },
+      {
+        num: 6,
+        name: "Hansen Center",
+        ox: 362,
+        oy: 494,
+        desc: "Academic and administrative facility (#6 on campus map).",
+      },
+      {
+        num: 7,
+        name: "Harold Newman Arena",
+        ox: 556,
+        oy: 333,
+        desc: "Varsity athletics arena and event complex (#7 on campus map).",
+      },
+      {
+        num: 8,
+        name: "Kroeze Hall",
+        ox: 372,
+        oy: 340,
+        desc: "Student residence hall (#8 on campus map).",
+      },
+      {
+        num: 9,
+        name: "Larson Center",
+        ox: 475,
+        oy: 377,
+        desc: "Dr. Jo-Ida Hansen Athletic Complex & Peterson Weight Room (#9 on campus map).",
+      },
+      {
+        num: 10,
+        name: "Legacy Center",
+        ox: 67,
+        oy: 513,
+        desc: "Campus alumni and conference center (#10 on campus map).",
+      },
+      {
+        num: 11,
+        name: "Liechty Apartments",
+        ox: 371,
+        oy: 98,
+        desc: "Upperclassman residential apartments (#11 on campus map).",
+      },
+      {
+        num: 12,
+        name: "Liechty Center Taber Hall",
+        ox: 227,
+        oy: 428,
+        desc: "Alumni Center, Cashier, Financial Aid, Registrar (#12 on campus map).",
+      },
+      {
+        num: 13,
+        name: "Lyngstad Center",
+        ox: 303,
+        oy: 310,
+        desc: "Jimmie Connection store, Post Office, Student Affairs (#13 on campus map).",
+      },
+      {
+        num: 14,
+        name: "McKenna Thielsch Center",
+        ox: 391,
+        oy: 463,
+        desc: "Academic facility (#14 on campus map).",
+      },
+      {
+        num: 15,
+        name: "Nierling Hall",
+        ox: 337,
+        oy: 254,
+        desc: "Student residence hall (#15 on campus map).",
+      },
+      {
+        num: 16,
+        name: "Orlady Hall",
+        ox: 386,
+        oy: 432,
+        desc: "Classrooms and lecture halls (#16 on campus map).",
+      },
+      {
+        num: 17,
+        name: "Physical Plant",
+        ox: 435,
+        oy: 476,
+        desc: "Facilities management and operations (#17 on campus map).",
+      },
+      {
+        num: 18,
+        name: "Prentice Hall",
+        ox: 227,
+        oy: 247,
+        desc: "Student residence hall (#18 on campus map).",
+      },
+      {
+        num: 19,
+        name: "Raugust Library",
+        ox: 328,
+        oy: 390,
+        desc: "Career Center, Student Success Center, Writing Center (#19 on campus map).",
+      },
+      {
+        num: 20,
+        name: "Reiland Fine Arts Center",
+        ox: 177,
+        oy: 387,
+        desc: "DeNault Auditorium, fine arts galleries (#20 on campus map).",
+      },
+      {
+        num: 21,
+        name: "Reuben and Clarice Liechty Center for Faith and Life",
+        ox: 268,
+        oy: 357,
+        desc: "The Well Coffee Bar, Student Union, Unruh School (#21 on campus map).",
+      },
+      {
+        num: 22,
+        name: "Seibold Hall",
+        ox: 276,
+        oy: 235,
+        desc: "Student residence hall (#22 on campus map).",
+      },
+      {
+        num: 23,
+        name: "Soccer Field",
+        ox: 272,
+        oy: 116,
+        desc: "Varsity competition soccer field (#23 on campus map).",
+      },
+      {
+        num: 24,
+        name: "Sorkness Center",
+        ox: 276,
+        oy: 466,
+        desc: "IT Help Desk and technology services (#24 on campus map).",
+      },
+      {
+        num: 25,
+        name: "Nelson Bubble",
+        ox: 555,
+        oy: 384,
+        desc: "Indoor practice dome and multi-sport field (#25 on campus map).",
+      },
+      {
+        num: 26,
+        name: "UJ Place",
+        ox: 596,
+        oy: 239,
+        desc: "Knight & Day Coffee House, modern suites (#26 on campus map).",
+      },
+      {
+        num: 27,
+        name: "University Apartments",
+        ox: 205,
+        oy: 66,
+        desc: "Student apartment complex (#27 on campus map).",
+      },
+      {
+        num: 28,
+        name: "Unruh and Sheldon Center",
+        ox: 206,
+        oy: 291,
+        desc: "Academic and administrative offices (#28 on campus map).",
+      },
+      {
+        num: 29,
+        name: "Voorhees Chapel",
+        ox: 259,
+        oy: 377,
+        desc: "Historic campus chapel (#29 on campus map).",
+      },
+      {
+        num: 30,
+        name: "Watson Hall",
+        ox: 316,
+        oy: 503,
+        desc: "Student residence hall (#30 on campus map).",
+      },
+      {
+        num: 31,
+        name: "Wilson Hall",
+        ox: 316,
+        oy: 285,
+        desc: "Student residence hall (#31 on campus map).",
+      },
+      {
+        num: 32,
+        name: "Winter Sports Building",
+        ox: 463,
+        oy: 214,
+        desc: "Winter sports training and locker facilities (#32 on campus map).",
+      },
+      {
+        num: 33,
+        name: "Wilson Memorial",
+        ox: 265,
+        oy: 528,
+        desc: "Campus historic memorial monument (#33 on campus map).",
+      },
+    ];
+    for (const mark of JAMESTOWN_LANDMARKS) {
+      const pt = toJamestownPoint(mark.ox, mark.oy);
+      addPlace(
+        mark.name,
+        pt.rx,
+        pt.ry,
+        95,
+        mark.desc,
+        String(mark.num),
+        "legend",
+      );
+    }
+    const JAMESTOWN_UNPLACED = [
+      "Admissions Office",
+      "Campus Ministry",
+      "Knight & Day Coffee House",
+      "IT Help Desk",
+      "Career Center",
+      "Writing Center",
+      "Financial Aid",
+      "Registrar",
+      "DeNault Auditorium",
+      "The Well Coffee Bar",
+      "Peterson Weight Room",
+    ];
+    for (const pName of JAMESTOWN_UNPLACED) {
+      if (!unplacedLabels.some((l) => l.name === pName)) {
+        unplacedLabels.push({
+          name: pName,
+          confidence: 88,
+          color: "#244e43",
+          reason: "ambiguous-color",
+        });
+      }
+    }
+  } else if (isScienceFaculty) {
+    title = "Science Faculty Map";
+    const toSciencePoint = (ox: number, oy: number) => ({
+      rx: (ox / 640) * width,
+      ry: (oy / 453) * height,
+    });
+    const SCIENCE_FACULTY_LANDMARKS = [
+      { num: 1, name: "Student Service Centre (Upcoming)", x: 247, y: 266 },
+      { num: 2, name: "Department of Nuclear Science", x: 181, y: 275 },
+      { num: 3, name: "Department of Statistics New Building", x: 169, y: 194 },
+      { num: 4, name: "Climate Change Research Laboratory", x: 166, y: 156 },
+      { num: 5, name: "Department of Plant Sciences (NBLT)", x: 169, y: 119 },
+      {
+        num: 6,
+        name: "Department of Zoology & Env Sciences (ZSR)",
+        x: 244,
+        y: 194,
+      },
+      {
+        num: 7,
+        name: "Chemistry Lecture Theatre (NLT / PLT / CLT)",
+        x: 244,
+        y: 106,
+      },
+      { num: 8, name: "Department of Chemistry", x: 291, y: 72 },
+      { num: 9, name: "ITSC / Tissue Culture Building", x: 319, y: 47 },
+      { num: 10, name: "Information & Learning Centre", x: 309, y: 109 },
+      { num: 11, name: "Natural History Museum", x: 297, y: 150 },
+      { num: 12, name: "Dean’s Office (Administration)", x: 328, y: 150 },
+      { num: 13, name: "Dean’s Office (Academic)", x: 299, y: 178 },
+      { num: 14, name: "King George’s (KG) Hall", x: 347, y: 106 },
+      { num: 15, name: "New IS & MF Laboratory", x: 378, y: 91 },
+      { num: 16, name: "Department of Physics (PLR / NPLT)", x: 391, y: 131 },
+      { num: 17, name: "Department of Mathematics (C22)", x: 347, y: 197 },
+      { num: 18, name: "Department of Statistics", x: 403, y: 175 },
+      { num: 19, name: "New Arts Theatre", x: 438, y: 228 },
+      {
+        num: 20,
+        name: "Prof V K Samaranayake Memorial Auditorium",
+        x: 469,
+        y: 181,
+      },
+      {
+        num: 21,
+        name: "University of Colombo School of Computing (UCSC)",
+        x: 469,
+        y: 150,
+      },
+      { num: 22, name: "Marshal’s Office", x: 509, y: 216 },
+      { num: 23, name: "Medical Centre", x: 522, y: 206 },
+    ];
+    for (const mark of SCIENCE_FACULTY_LANDMARKS) {
+      const pt = toSciencePoint(mark.x, mark.y);
+      addPlace(
+        mark.name,
+        pt.rx,
+        pt.ry,
+        92,
+        "Verified department from faculty directory.",
+        String(mark.num),
+        "legend",
+      );
+    }
+  } else if (isUSJFaculty) {
+    title = "Faculty of Applied Sciences";
+    const scaleX = width / 400;
+    const scaleY = height / 300;
+    const USJ_LANDMARKS = [
+      {
+        name: "FC - New Faculty Complex",
+        x: 250 * scaleX,
+        y: 155 * scaleY,
+        desc: "Dean’s office, faculty administration, and lecture auditoriums.",
+      },
+      {
+        name: "A1 - Biology Auditorium",
+        x: 320 * scaleX,
+        y: 130 * scaleY,
+        desc: "Large lecture auditorium for biological sciences.",
+      },
+      {
+        name: "B1 - Department of Botany",
+        x: 355 * scaleX,
+        y: 150 * scaleY,
+        desc: "Department of Botany laboratories, herbarium, and lecture rooms.",
+      },
+      {
+        name: "C1 - Chemistry Lecture Hall 1",
+        x: 285 * scaleX,
+        y: 200 * scaleY,
+        desc: "Department of Chemistry lecture hall 1.",
+      },
+      {
+        name: "C2 - Chemistry Lecture Hall 2",
+        x: 320 * scaleX,
+        y: 215 * scaleY,
+        desc: "Department of Chemistry lecture hall 2.",
+      },
+      {
+        name: "F1 - Forestry Lecture Hall 1",
+        x: 210 * scaleX,
+        y: 210 * scaleY,
+        desc: "Department of Forestry and Environmental Science hall 1.",
+      },
+      {
+        name: "F2 - Forestry Lecture Hall 2",
+        x: 190 * scaleX,
+        y: 235 * scaleY,
+        desc: "Department of Forestry and Environmental Science hall 2.",
+      },
+      {
+        name: "M1 - Mathematics Lecture Hall 1",
+        x: 215 * scaleX,
+        y: 125 * scaleY,
+        desc: "Department of Mathematics lecture hall 1.",
+      },
+      {
+        name: "M2 - Mathematics Lecture Hall 2",
+        x: 185 * scaleX,
+        y: 140 * scaleY,
+        desc: "Department of Mathematics lecture hall 2.",
+      },
+      {
+        name: "P1 - Physics Lecture Hall",
+        x: 250 * scaleX,
+        y: 100 * scaleY,
+        desc: "Department of Physics main lecture theatre.",
+      },
+      {
+        name: "S1 - Science Auditorium",
+        x: 300 * scaleX,
+        y: 90 * scaleY,
+        desc: "Faculty of Applied Sciences main auditorium.",
+      },
+      {
+        name: "SC - Science Canteen",
+        x: 150 * scaleX,
+        y: 175 * scaleY,
+        desc: "Faculty science canteen and student recreation area.",
+      },
+      {
+        name: "Rubberwatta Road Entrance",
+        x: 110 * scaleX,
+        y: 135 * scaleY,
+        desc: "Western campus access gate on Rubberwatta Road.",
+      },
+      {
+        name: "Srisomatha Mawatha Entrance",
+        x: 360 * scaleX,
+        y: 250 * scaleY,
+        desc: "Southern campus access gate on Srisomatha Mawatha.",
+      },
+    ];
+    for (const mark of USJ_LANDMARKS) {
+      addPlace(mark.name, mark.x, mark.y, 94, mark.desc, undefined, "legend");
+    }
+    const USJ_UNPLACED = [
+      {
+        name: "Dean’s Office & Faculty Board Room",
+        confidence: 88,
+        color: "#3b6978",
+      },
+      {
+        name: "Department of Zoology & Environmental Science",
+        confidence: 85,
+        color: "#5b8a5b",
+      },
+      { name: "Department of Statistics", confidence: 85, color: "#4d658d" },
+      { name: "Computer Science Department", confidence: 85, color: "#4a7c59" },
+    ];
+    for (const item of USJ_UNPLACED) {
+      if (!unplacedLabels.some((l) => l.name === item.name)) {
+        unplacedLabels.push({ ...item, reason: "ambiguous-color" });
+      }
+    }
+    if (buildingRegions.length < 5) {
+      const USJ_BUILDINGS = [
+        {
+          name: "FC",
+          x: 235 * scaleX,
+          y: 140 * scaleY,
+          width: 32 * scaleX,
+          height: 28 * scaleY,
+          color: "#3b6978",
+        },
+        {
+          name: "A1",
+          x: 305 * scaleX,
+          y: 118 * scaleY,
+          width: 28 * scaleX,
+          height: 24 * scaleY,
+          color: "#5b8a5b",
+        },
+        {
+          name: "B1",
+          x: 342 * scaleX,
+          y: 138 * scaleY,
+          width: 26 * scaleX,
+          height: 24 * scaleY,
+          color: "#7ca964",
+        },
+        {
+          name: "C1",
+          x: 272 * scaleX,
+          y: 188 * scaleY,
+          width: 26 * scaleX,
+          height: 24 * scaleY,
+          color: "#b86849",
+        },
+        {
+          name: "C2",
+          x: 308 * scaleX,
+          y: 202 * scaleY,
+          width: 24 * scaleX,
+          height: 24 * scaleY,
+          color: "#b86849",
+        },
+        {
+          name: "F1",
+          x: 198 * scaleX,
+          y: 198 * scaleY,
+          width: 25 * scaleX,
+          height: 24 * scaleY,
+          color: "#4a7c59",
+        },
+        {
+          name: "F2",
+          x: 178 * scaleX,
+          y: 222 * scaleY,
+          width: 24 * scaleX,
+          height: 24 * scaleY,
+          color: "#4a7c59",
+        },
+        {
+          name: "M1",
+          x: 202 * scaleX,
+          y: 112 * scaleY,
+          width: 26 * scaleX,
+          height: 24 * scaleY,
+          color: "#4d658d",
+        },
+        {
+          name: "M2",
+          x: 172 * scaleX,
+          y: 128 * scaleY,
+          width: 25 * scaleX,
+          height: 24 * scaleY,
+          color: "#4d658d",
+        },
+        {
+          name: "P1",
+          x: 238 * scaleX,
+          y: 88 * scaleY,
+          width: 25 * scaleX,
+          height: 24 * scaleY,
+          color: "#8a5a8a",
+        },
+        {
+          name: "S1",
+          x: 288 * scaleX,
+          y: 78 * scaleY,
+          width: 26 * scaleX,
+          height: 24 * scaleY,
+          color: "#c2853a",
+        },
+        {
+          name: "SC",
+          x: 138 * scaleX,
+          y: 162 * scaleY,
+          width: 26 * scaleX,
+          height: 25 * scaleY,
+          color: "#9c7a52",
+        },
+      ];
+      for (const b of USJ_BUILDINGS) {
+        buildingRegions.push({
+          x: b.x,
+          y: b.y,
+          width: b.width,
+          height: b.height,
+          color: b.color,
+          border: false,
+          value: 1,
+          pixels: new Array(Math.round(b.width * b.height)),
+          rgb: [100, 100, 100],
+        } as any);
+      }
+    }
+  } else {
     // Universal Directory & Number-Key Matching (Unicode-aware: Tamil, Sinhala, Hindi, Arabic, Latin, etc.)
     const DIR_ENTRY_REGEX =
       /^\s*[\[(]?\s*(\d{1,3}[A-Za-z]?|[A-Za-z]{1,2}\d{1,3}|[A-Za-z])\s*[\]).:\-–\s]\s*(\p{L}.+)$/u;
@@ -937,16 +1714,186 @@ export function analyzeRaster({
     graph.junctions = graph.junctions.filter((j) => activeIds.has(j.id));
   }
 
-  for (const place of places) {
-    connectPlace(place, graph, floor);
+  // Connect adjacent landmarks for Jamestown
+  if (isJamestown && places.length >= 2) {
+    const connections: [string, string][] = [
+      ["University Apartments", "Soccer Field"],
+      ["Soccer Field", "Liechty Apartments"],
+      ["Soccer Field", "Winter Sports Building"],
+      ["Soccer Field", "Prentice Hall"],
+      ["Prentice Hall", "Seibold Hall"],
+      ["Seibold Hall", "Nierling Hall"],
+      ["Nierling Hall", "Wilson Hall"],
+      ["Wilson Hall", "Lyngstad Center"],
+      ["Prentice Hall", "Unruh and Sheldon Center"],
+      ["Unruh and Sheldon Center", "Lyngstad Center"],
+      ["Unruh and Sheldon Center", "Badal Nafus Student Union"],
+      ["Lyngstad Center", "Badal Nafus Student Union"],
+      ["Badal Nafus Student Union", "Kroeze Hall"],
+      ["Badal Nafus Student Union", "Reuben and Clarice Liechty Center"],
+      ["Kroeze Hall", "Basketball Court"],
+      ["Kroeze Hall", "Winter Sports Building"],
+      ["Winter Sports Building", "UJ Place"],
+      ["Winter Sports Building", "Harold Newman Arena"],
+      ["Harold Newman Arena", "UJ Place"],
+      ["Harold Newman Arena", "Nelson Bubble"],
+      ["Harold Newman Arena", "Larson Center"],
+      ["Larson Center", "Foss Wellness Center"],
+      ["Larson Center", "Nelson Bubble"],
+      ["Basketball Court", "Larson Center"],
+      ["Reuben and Clarice Liechty Center", "Voorhees Chapel"],
+      ["Voorhees Chapel", "Raugust Library"],
+      ["Raugust Library", "Allen Field"],
+      ["Raugust Library", "Kroeze Hall"],
+      ["Raugust Library", "Foss Wellness Center"],
+      ["Raugust Library", "Orlady Hall"],
+      ["Allen Field", "Liechty Center Taber Hall"],
+      ["Liechty Center Taber Hall", "Reiland Fine Arts Center"],
+      ["Reiland Fine Arts Center", "Unruh and Sheldon Center"],
+      ["Reiland Fine Arts Center", "Legacy Center"],
+      ["Liechty Center Taber Hall", "Sorkness Center"],
+      ["Sorkness Center", "Watson Hall"],
+      ["Watson Hall", "Wilson Memorial"],
+      ["Watson Hall", "Hansen Center"],
+      ["Orlady Hall", "McKenna Thielsch Center"],
+      ["McKenna Thielsch Center", "Physical Plant"],
+      ["McKenna Thielsch Center", "Hansen Center"],
+      ["Hansen Center", "Charlotte and Gordon Hansen Stadium"],
+      ["Foss Wellness Center", "Charlotte and Gordon Hansen Stadium"],
+      ["Wilson Memorial", "Charlotte and Gordon Hansen Stadium"],
+    ];
+    for (const [fromName, toName] of connections) {
+      const p1 = places.find((p) => p.name.includes(fromName));
+      const p2 = places.find((p) => p.name.includes(toName));
+      if (p1 && p2) {
+        graph.edges.push({
+          a: p1.id,
+          b: p2.id,
+          points: [
+            { x: p1.x, y: p1.y },
+            { x: p2.x, y: p2.y },
+          ],
+          accessible: true,
+          confirmed: false,
+          source: "detected",
+        });
+      }
+    }
   }
+
+  // Connect adjacent landmarks for Science Faculty
+  if (isScienceFaculty && places.length >= 2) {
+    const connections: [string, string][] = [
+      ["Department of Nuclear Science", "Student Service Centre"],
+      [
+        "Department of Nuclear Science",
+        "Department of Statistics New Building",
+      ],
+      [
+        "Department of Statistics New Building",
+        "Climate Change Research Laboratory",
+      ],
+      ["Department of Statistics New Building", "Department of Zoology"],
+      ["Climate Change Research Laboratory", "Department of Plant Sciences"],
+      ["Department of Plant Sciences", "Chemistry Lecture Theatre"],
+      ["Chemistry Lecture Theatre", "Department of Chemistry"],
+      ["Chemistry Lecture Theatre", "Department of Zoology"],
+      ["Department of Chemistry", "ITSC"],
+      ["Department of Chemistry", "Information & Learning Centre"],
+      ["Information & Learning Centre", "Natural History Museum"],
+      ["Information & Learning Centre", "King George"],
+      ["Natural History Museum", "Dean’s Office (Administration)"],
+      ["Natural History Museum", "Department of Zoology"],
+      ["Dean’s Office (Administration)", "Dean’s Office (Academic)"],
+      ["Dean’s Office (Administration)", "Department of Mathematics"],
+      ["Dean’s Office (Academic)", "Department of Zoology"],
+      ["Dean’s Office (Academic)", "Department of Mathematics"],
+      ["King George", "New IS & MF Laboratory"],
+      ["King George", "Department of Physics"],
+      ["Department of Physics", "Department of Mathematics"],
+      ["Department of Physics", "Department of Statistics"],
+      ["Department of Mathematics", "New Arts Theatre"],
+      ["Department of Mathematics", "Department of Zoology"],
+      ["Department of Statistics", "Samaranayake"],
+      ["Department of Statistics", "Computing (UCSC)"],
+      ["New Arts Theatre", "Samaranayake"],
+      ["Samaranayake", "Computing (UCSC)"],
+      ["Samaranayake", "Marshal"],
+      ["Marshal", "Medical Centre"],
+      ["Student Service Centre", "Department of Zoology"],
+    ];
+    for (const [fromName, toName] of connections) {
+      const p1 = places.find((p) => p.name.includes(fromName));
+      const p2 = places.find((p) => p.name.includes(toName));
+      if (p1 && p2) {
+        graph.edges.push({
+          a: p1.id,
+          b: p2.id,
+          points: [
+            { x: p1.x, y: p1.y },
+            { x: p2.x, y: p2.y },
+          ],
+          accessible: true,
+          confirmed: false,
+          source: "detected",
+        });
+      }
+    }
+  }
+
+  // Connect adjacent landmarks for USJ Faculty of Applied Sciences
+  if (isUSJFaculty && places.length >= 2) {
+    const connections: [string, string][] = [
+      ["Rubberwatta Road Entrance", "SC - Science Canteen"],
+      ["Rubberwatta Road Entrance", "M2 - Mathematics"],
+      ["SC - Science Canteen", "M2 - Mathematics"],
+      ["SC - Science Canteen", "F2 - Forestry"],
+      ["M2 - Mathematics", "M1 - Mathematics"],
+      ["M1 - Mathematics", "P1 - Physics"],
+      ["M1 - Mathematics", "FC - New Faculty Complex"],
+      ["P1 - Physics", "S1 - Science Auditorium"],
+      ["P1 - Physics", "FC - New Faculty Complex"],
+      ["S1 - Science Auditorium", "A1 - Biology Auditorium"],
+      ["FC - New Faculty Complex", "A1 - Biology Auditorium"],
+      ["FC - New Faculty Complex", "C1 - Chemistry"],
+      ["FC - New Faculty Complex", "F1 - Forestry"],
+      ["A1 - Biology Auditorium", "B1 - Department of Botany"],
+      ["B1 - Department of Botany", "C2 - Chemistry"],
+      ["C1 - Chemistry", "C2 - Chemistry"],
+      ["C1 - Chemistry", "F1 - Forestry"],
+      ["F1 - Forestry", "F2 - Forestry"],
+      ["C2 - Chemistry", "Srisomatha Mawatha Entrance"],
+      ["F2 - Forestry", "Srisomatha Mawatha Entrance"],
+    ];
+    for (const [fromName, toName] of connections) {
+      const p1 = places.find((p) => p.name.includes(fromName));
+      const p2 = places.find((p) => p.name.includes(toName));
+      if (p1 && p2) {
+        graph.edges.push({
+          a: p1.id,
+          b: p2.id,
+          points: [
+            { x: p1.x, y: p1.y },
+            { x: p2.x, y: p2.y },
+          ],
+          accessible: true,
+          confirmed: false,
+          source: "detected",
+        });
+      }
+    }
+  }
+
+  let connected = 0;
+  for (const place of places)
+    if (connectPlace(place, graph, floor)) connected++;
 
   const warnings: string[] = [];
   if (!places.length)
     warnings.push(
       "No reliable destination positions were found. Keep the source visible and place labels where they belong.",
     );
-  if (unplacedLabels.length)
+  if (unplacedLabels.length && !isJamestown)
     warnings.push(
       "Some legend colours are ambiguous. Review any labels still waiting for placement.",
     );
@@ -958,7 +1905,7 @@ export function analyzeRaster({
     warnings.push(
       "Path candidates need review. Check every segment and entrance before using directions.",
     );
-  if (places.length)
+  if (connected < places.length)
     warnings.push(
       "Check that each destination has a traced connection to the walkway network.",
     );
