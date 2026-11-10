@@ -485,7 +485,7 @@ export function extractLabels(
         confidence: word.confidence,
       })),
     )
-    .filter((item) => item.number && item.confidence >= 40);
+    .filter((item) => item.number && item.confidence >= 25);
   const legend = new Map<
     string,
     {
@@ -502,7 +502,7 @@ export function extractLabels(
       lh = b.y1 - b.y0;
     let candidates = lines.filter(
       (line) =>
-        line.confidence > 40 &&
+        line.confidence >= 25 &&
         /(?:\p{L}\p{M}*){2}/u.test(line.text) &&
         line.bbox.x0 >= b.x1 - 4 &&
         line.bbox.x0 - b.x1 < Math.max(90, lh * 8) &&
@@ -527,7 +527,7 @@ export function extractLabels(
     const match = line.text.match(/^\s*(\d{1,3})[.),:\-–\s]\s+(.{2,})$/u);
     if (
       match &&
-      line.confidence >= 40 &&
+      line.confidence >= 25 &&
       /(?:\p{L}\p{M}*){2}/u.test(match[2])
     ) {
       const num = String(Number(match[1]));
@@ -549,7 +549,7 @@ export function extractLabels(
   // Attach sub-bullets / aliases (e.g. "+ Admissions", "+ IT Help Desk") to preceding numbered entry
   for (const line of lines) {
     const bullet = line.text.match(/^\s*[-+*•·]\s*(.{3,})$/u);
-    if (bullet && line.confidence >= 40) {
+    if (bullet && line.confidence >= 25) {
       const text = clean(bullet[1]);
       if (text.length >= 3 && !/\b(map|parking)\b/i.test(text)) {
         let bestKey: string | null = null;
@@ -619,7 +619,7 @@ export function extractLabels(
         /\b(room|rm|office|lab|conference|wc|toilet|restroom|stairs|staircase|lift|elevator|corridor|entrance|exit|lobby|cafe|kitchen|storage|auditorium|lounge|dining|staff|lecture\s*hall|computer\s*room|you\s*are\s*here|academic\s*staff|washroom)\b/i.test(
           line.text,
         );
-      const minConfidence = isRoom ? 40 : 72;
+      const minConfidence = isRoom ? 20 : 50;
       if (line.confidence < minConfidence) continue;
       if (!isRoom && !/(?:\p{L}\p{M}*){3}/u.test(line.text)) continue;
       const { bbox: b } = line,

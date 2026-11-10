@@ -1,6 +1,30 @@
 import { CAMPUS_ID, entrances } from "./campus";
 export const SESSION_KEY = "uniway.visitor.v1";
 export const SESSION_DURATION = 3 * 60 * 60 * 1000;
+export const MAP_EXPIRY_DURATION = 3 * 60 * 60 * 1000;
+
+export function mapExpiresAt(uploadedAt = Date.now()): number {
+  return uploadedAt + MAP_EXPIRY_DURATION;
+}
+
+export function mapRemainingTime(expiresAt: number, now = Date.now()): number {
+  return Math.max(0, expiresAt - now);
+}
+
+export function isMapExpired(expiresAt: number, now = Date.now()): boolean {
+  return expiresAt <= now;
+}
+
+export function formatMapExpiration(ms: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  const seconds = totalSeconds % 60;
+  return `${minutes}m ${seconds}s`;
+}
 export type VisitorSession = {
   campusId: string;
   entranceId: string;

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -21,6 +21,7 @@ import {
 } from "./preparedMap";
 import type { PreparedMap } from "./preparedMap";
 import ImageMapCanvas from "./ImageMapCanvas";
+import { formatMapExpiration, mapExpiresAt, mapRemainingTime } from "./session";
 
 type Tool = "place" | "path" | "scale" | "pan" | "move";
 export default function MapEditor({
@@ -36,6 +37,21 @@ export default function MapEditor({
   onBack: () => void;
   onPreview?: (map: PreparedMap) => void;
 }) {
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const mapExpiryTarget =
+    map.expiresAt ??
+    map.image?.expiresAt ??
+    (map.uploadedAt ? mapExpiresAt(map.uploadedAt) : null);
+  const mapRemainingMs = mapExpiryTarget
+    ? mapRemainingTime(mapExpiryTarget, currentTime)
+    : null;
+  const mapExpiryText =
+    mapRemainingMs !== null ? formatMapExpiration(mapRemainingMs) : null;
+
   const [tool, setTool] = useState<Tool>(map.analysis ? "pan" : "place");
   const [active, setActive] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<string | null>(null);
@@ -154,9 +170,30 @@ export default function MapEditor({
               : "Add places, connect the walking paths, then review your map."}
           </p>
         </div>
-        <span className="preparation-badge">
-          {map.analysis ? "Local analysis" : "Guided preparation"}
-        </span>
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <span className="preparation-badge">
+            {map.analysis ? "Local analysis" : "Guided preparation"}
+          </span>
+          {mapExpiryText && (
+            <span
+              className="preparation-badge"
+              style={{
+                background: "rgba(5, 140, 66, 0.15)",
+                borderColor: "rgba(5, 140, 66, 0.35)",
+              }}
+              title="Uploaded maps expire after 3 hours for privacy and storage hygiene"
+            >
+              ⏳ Expires in {mapExpiryText}
+            </span>
+          )}
+        </div>
       </div>
       {map.analysis && (
         <section className="analysis-report" aria-label="Map analysis result">

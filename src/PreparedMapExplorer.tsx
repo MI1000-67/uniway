@@ -25,6 +25,7 @@ import { CategoryIcon } from "./icons";
 import ImageMapCanvas from "./ImageMapCanvas";
 import { RouteChoices } from "./RouteChoices";
 import { searchMatchingPlaces } from "./search";
+import { formatMapExpiration, mapExpiresAt, mapRemainingTime } from "./session";
 
 export default function PreparedMapExplorer({
   map,
@@ -37,6 +38,21 @@ export default function PreparedMapExplorer({
   onEdit: () => void;
   sessionTime?: string;
 }) {
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const mapExpiryTarget =
+    map.expiresAt ??
+    map.image?.expiresAt ??
+    (map.uploadedAt ? mapExpiresAt(map.uploadedAt) : null);
+  const mapRemainingMs = mapExpiryTarget
+    ? mapRemainingTime(mapExpiryTarget, currentTime)
+    : null;
+  const mapExpiryText =
+    mapRemainingMs !== null ? formatMapExpiration(mapRemainingMs) : null;
+
   const [collapsed, setCollapsed] = useState(false);
   const [routeMode, setRouteMode] = useState(false);
   const [routeVersion, setRouteVersion] = useState(0);
@@ -154,13 +170,24 @@ export default function PreparedMapExplorer({
                   <p className="eyebrow">YOUR INTERACTIVE CAMPUS</p>
                   <h1>{map.name}</h1>
                 </div>
-                <button
-                  className="icon-button"
-                  aria-label="Edit this map"
-                  onClick={onEdit}
-                >
-                  <Pencil size={18} />
-                </button>
+                <div className="prepared-heading-actions">
+                  {mapExpiryText && (
+                    <span
+                      className="map-expiration-badge"
+                      title="Uploaded maps expire after 3 hours for privacy and storage hygiene"
+                    >
+                      <Timer size={13} />
+                      <span>{mapExpiryText}</span>
+                    </span>
+                  )}
+                  <button
+                    className="icon-button"
+                    aria-label="Edit this map"
+                    onClick={onEdit}
+                  >
+                    <Pencil size={18} />
+                  </button>
+                </div>
               </div>
               {!map.published && (
                 <div className="draft-notice">
@@ -545,12 +572,20 @@ export default function PreparedMapExplorer({
           )}
         </div>
         <div className="prepared-footer">
-          {sessionTime && (
+          {mapExpiryText ? (
+            <div
+              className="prepared-timer map-timer"
+              title="Uploaded maps expire automatically after 3 hours for privacy and storage hygiene"
+            >
+              <Timer size={16} />
+              Map expires in <strong>{mapExpiryText}</strong>
+            </div>
+          ) : sessionTime ? (
             <div className="prepared-timer">
               <Timer size={16} />
               Visitor session <strong>{sessionTime}</strong>
             </div>
-          )}
+          ) : null}
           <button className="text-button" onClick={onDemo}>
             <ArrowLeft size={15} /> Willowbrook demo
           </button>

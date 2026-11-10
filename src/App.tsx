@@ -130,6 +130,53 @@ export default function App() {
     };
   }, []);
 
+  // 3-hour disappearance timer for uploaded maps (privacy, storage hygiene, and local lifecycle)
+  useEffect(() => {
+    const checkMapExpirations = () => {
+      const now = Date.now();
+      setImages((currentImages) => {
+        const expiredImages = currentImages.filter(
+          (img) => img.expiresAt && now >= img.expiresAt,
+        );
+        if (!expiredImages.length) return currentImages;
+
+        expiredImages.forEach((img) => URL.revokeObjectURL(img.url));
+        const expiredIds = new Set(expiredImages.map((img) => img.id));
+
+        setPreparedMaps((maps) => {
+          const next = { ...maps };
+          expiredIds.forEach((id) => delete next[id]);
+          return next;
+        });
+
+        setPublishedMaps((maps) => {
+          const next = { ...maps };
+          expiredIds.forEach((id) => delete next[id]);
+          return next;
+        });
+
+        setActiveMapId((currentActive) =>
+          currentActive && expiredIds.has(currentActive) ? null : currentActive,
+        );
+
+        setEditingMapId((currentEditing) =>
+          currentEditing && expiredIds.has(currentEditing)
+            ? null
+            : currentEditing,
+        );
+
+        setToast(
+          "Uploaded map expired after 3 hours for privacy and storage hygiene.",
+        );
+
+        return currentImages.filter((img) => !expiredIds.has(img.id));
+      });
+    };
+
+    const interval = setInterval(checkMapExpirations, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleConnectNavigate = useCallback(
     (location?: LocationReference, locationName?: string) => {
       const destination = resolveDemoLocation(location);

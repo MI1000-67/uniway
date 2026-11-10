@@ -6,9 +6,17 @@ import {
   removeMapNode,
   reviewMap,
   routeOnMap,
+  routesOnMap,
   autoConnectPlaces,
 } from "./preparedMap";
 import type { PreparedMap } from "./preparedMap";
+import {
+  MAP_EXPIRY_DURATION,
+  mapExpiresAt,
+  mapRemainingTime,
+  formatMapExpiration,
+  isMapExpired,
+} from "./session";
 
 export function fixtureMap(): PreparedMap {
   return {
@@ -132,5 +140,87 @@ describe("uploaded map routing", () => {
     expect(reviewMap(disconnectedMap).length).toBeGreaterThan(0);
     const fixed = autoConnectPlaces(disconnectedMap);
     expect(reviewMap(fixed)).toEqual([]);
+    // Step-free connectivity is preserved for non-stair connections
+    const newEdge = fixed.edges.find(
+      (e) =>
+        (e.from === "library" || e.to === "library") &&
+        e !== disconnectedMap.edges[0],
+    );
+    expect(newEdge?.stepFree).toBe(true);
+  });
+  it("routesOnMap returns three distinct alternative routes and never has undefined in instructions", () => {
+    const map = fixtureMap();
+    const routes = routesOnMap(map, "gate", "library", false);
+    expect(routes).toHaveLength(3);
+    expect(routes[0].distancePixels).toBeLessThanOrEqual(
+      routes[1].distancePixels,
+    );
+    expect(routes[1].distancePixels).toBeLessThanOrEqual(
+      routes[2].distancePixels,
+    );
+    expect(routes[0].instructions[0]).toContain("Main Entrance");
+    for (const r of routes) {
+      for (const inst of r.instructions) {
+        expect(inst).not.toContain("undefined");
+      }
+    }
+
+    // Direct 2-node graph test: verifies alternative paths diverge with distinct waypoints
+    const directMap: PreparedMap = {
+      ...map,
+      nodes: [
+        { id: "p1", x: 100, y: 100, landmark: "Room A" },
+        { id: "p2", x: 300, y: 100, landmark: "Room B" },
+      ],
+      edges: [{ from: "p1", to: "p2", stepFree: true }],
+      places: [
+        {
+          id: "pl1",
+          nodeId: "p1",
+          name: "Room A",
+          category: "Teaching",
+          entrance: true,
+        },
+        {
+          id: "pl2",
+          nodeId: "p2",
+          name: "Room B",
+          category: "Teaching",
+          entrance: false,
+        },
+      ],
+    };
+    const directRoutes = routesOnMap(directMap, "p1", "p2", false);
+    expect(directRoutes).toHaveLength(3);
+    expect(directRoutes[0].points.length).toBe(2);
+    expect(directRoutes[1].points.length).toBeGreaterThanOrEqual(3);
+    expect(directRoutes[2].points.length).toBeGreaterThanOrEqual(3);
+    for (const r of directRoutes) {
+      for (const inst of r.instructions) {
+        expect(inst).not.toContain("undefined");
+      }
+    }
+  });
+  it("manages 3-hour map disappearance lifecycle with accurate countdown formatting", () => {
+    expect(MAP_EXPIRY_DURATION).toBe(3 * 60 * 60 * 1000);
+    const now = 1000000;
+    const expires = mapExpiresAt(now);
+    expect(expires).toBe(now + 3 * 3600 * 1000);
+    expect(isMapExpired(expires, now)).toBe(false);
+    expect(isMapExpired(expires, expires)).toBe(true);
+    expect(isMapExpired(expires, expires + 1000)).toBe(true);
+
+    // Remaining time
+    expect(mapRemainingTime(expires, now)).toBe(3 * 3600 * 1000);
+    expect(mapRemainingTime(expires, expires + 5000)).toBe(0);
+
+    // Formatting
+    expect(formatMapExpiration(3 * 3600 * 1000)).toBe("3h 0m");
+    expect(formatMapExpiration(2 * 3600 * 1000 + 45 * 60 * 1000)).toBe(
+      "2h 45m",
+    );
+    expect(formatMapExpiration(59 * 60 * 1000 + 30 * 1000)).toBe("59m 30s");
+    expect(formatMapExpiration(45 * 1000)).toBe("0m 45s");
+    expect(formatMapExpiration(0)).toBe("0m 0s");
   });
 });

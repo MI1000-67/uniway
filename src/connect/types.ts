@@ -71,3 +71,35 @@ export interface InterestPoll {
   userVotedOptionId?: string;
   expiresAt: string;
 }
+
+export type PosterCategory =
+  "All" | "Events" | "Clubs" | "Academic" | "Sports" | "Civic";
+
+export interface PosterPollOption {
+  id: string;
+  label: string;
+  votes: number;
+}
+
+export interface PosterPoll {
+  id: string;
+  question: string;
+  options: PosterPollOption[];
+  totalVotes: number;
+  userVotedOptionId?: string;
+}
+
+export interface CampusPoster {
+  id: string;
+  title: string;
+  author: string;
+  category: "Events" | "Clubs" | "Academic" | "Sports" | "Civic";
+  description: string;
+  imageUrl?: string;
+  bannerGradient?: string;
+  location?: LocationReference;
+  locationName: string;
+  eventDate?: string;
+  createdAt: string;
+  poll: PosterPoll;
+}

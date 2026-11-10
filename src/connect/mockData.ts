@@ -1,5 +1,6 @@
 import { demoLocation } from "../locations";
 import type {
+  CampusPoster,
   CommunityPost,
   InterestPoll,
   VolunteerOpportunity,
@@ -220,5 +221,106 @@ export const initialInterestPolls: InterestPoll[] = [
     ],
     totalVotes: 89,
     expiresAt: "2026-11-10T23:59:59Z",
+  },
+];
+
+export const initialCampusPosters: CampusPoster[] = [
+  {
+    id: "poster-1",
+    title: "Annual Campus Innovation Hackathon 2026",
+    author: "School of Science Tech Guild",
+    category: "Events",
+    location: demoLocation("science"),
+    locationName: "School of Science — Ground Floor Foyer",
+    eventDate: "Friday – Sunday, Nov 21–23",
+    description:
+      "48-hour build sprint addressing real student challenges: accessible indoor navigation, campus greening, and peer tools. Food, hardware kits, and industry mentors provided.",
+    bannerGradient: "linear-gradient(135deg, #058c42, #0d5c31)",
+    createdAt: "2026-11-10T09:00:00Z",
+    poll: {
+      id: "poll-poster-1",
+      question: "Which track will your team hack on?",
+      totalVotes: 120,
+      options: [
+        {
+          id: "p1-opt-1",
+          label: "Smart Navigation & Indoor Mobility",
+          votes: 42,
+        },
+        {
+          id: "p1-opt-2",
+          label: "Green Campus & Circular Economy",
+          votes: 28,
+        },
+        {
+          id: "p1-opt-3",
+          label: "AI Student Assistant & Civic Hub",
+          votes: 35,
+        },
+        { id: "p1-opt-4", label: "Open Hardware & IoT", votes: 15 },
+      ],
+    },
+  },
+  {
+    id: "poster-2",
+    title: "Night Stargazing & Planetary Observation Meet",
+    author: "Astronomy & Physics Club",
+    category: "Clubs",
+    location: demoLocation("oval"),
+    locationName: "University Sports Ground & Oval",
+    eventDate: "Wednesday, Nov 19 · 19:30 – 22:00",
+    description:
+      "Join us for telescopic observation of Jupiter, Saturn's rings, and lunar craters. Warm tea and star maps will be provided at the pavilion.",
+    bannerGradient: "linear-gradient(135deg, #093c30, #14532d)",
+    createdAt: "2026-11-09T14:30:00Z",
+    poll: {
+      id: "poll-poster-2",
+      question: "What gear are you bringing to the session?",
+      totalVotes: 128,
+      options: [
+        {
+          id: "p2-opt-1",
+          label: "Bringing personal telescope / tripod",
+          votes: 18,
+        },
+        { id: "p2-opt-2", label: "Bringing binoculars / camera", votes: 34 },
+        {
+          id: "p2-opt-3",
+          label: "Will use club observatory equipment",
+          votes: 76,
+        },
+      ],
+    },
+  },
+  {
+    id: "poster-3",
+    title: "Campus Green Wall & Rooftop Planting Drive",
+    author: "UniWay Sustainability Network",
+    category: "Civic",
+    location: demoLocation("student"),
+    locationName: "Student Centre — Rooftop Garden",
+    eventDate: "Saturday, Nov 29 · 10:00 – 13:00",
+    description:
+      "Help assemble modular vertical planter boxes and plant pollinator-friendly shrubs on the Student Centre terrace. Tools, gloves, and lunch provided.",
+    bannerGradient: "linear-gradient(135deg, #15803d, #047857)",
+    createdAt: "2026-11-08T11:15:00Z",
+    poll: {
+      id: "poll-poster-3",
+      question: "Which volunteer session fits your schedule?",
+      totalVotes: 161,
+      options: [
+        {
+          id: "p3-opt-1",
+          label: "Morning Assembly (09:30 – 11:30)",
+          votes: 52,
+        },
+        {
+          id: "p3-opt-2",
+          label: "Planting & Installation (11:30 – 13:30)",
+          votes: 68,
+        },
+        { id: "p3-opt-3", label: "Full Session with Lunch", votes: 41 },
+      ],
+    },
   },
 ];

@@ -14,12 +14,16 @@ import { loadImage, validateImage } from "./uploads";
 import { convertHeicToJpegBlob, isHeicFile } from "./heicConverter";
 import type { PreparedMap } from "./preparedMap";
 import MapPreparation from "./MapPreparation";
+import { formatMapExpiration, mapExpiresAt, mapRemainingTime } from "./session";
+
 export type UploadedImage = {
   id: string;
   name: string;
   url: string;
   width: number;
   height: number;
+  uploadedAt?: number;
+  expiresAt?: number;
 };
 export default function UploadPanel({
   images,
@@ -47,6 +51,11 @@ export default function UploadPanel({
   const [zoom, setZoom] = useState(1);
   const alive = useRef(true);
   const input = useRef<HTMLInputElement>(null);
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -80,12 +89,15 @@ export default function UploadPanel({
       const url = URL.createObjectURL(sourceBlob);
       try {
         const image = await loadImage(url);
+        const now = Date.now();
         valid.push({
           id: crypto.randomUUID(),
           name: file.name,
           url,
           width: image.naturalWidth,
           height: image.naturalHeight,
+          uploadedAt: now,
+          expiresAt: mapExpiresAt(now),
         });
       } catch {
         URL.revokeObjectURL(url);
@@ -174,6 +186,17 @@ export default function UploadPanel({
                 >
                   <img src={image.url} alt={image.name} />
                   <span>{image.name}</span>
+                  {image.expiresAt && (
+                    <span
+                      className="thumbnail-expiry"
+                      title="Uploaded maps expire after 3 hours for privacy and storage hygiene"
+                    >
+                      ⏳{" "}
+                      {formatMapExpiration(
+                        mapRemainingTime(image.expiresAt, currentTime),
+                      )}
+                    </span>
+                  )}
                 </button>
                 <button
                   className="thumbnail-remove"

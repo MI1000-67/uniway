@@ -25,15 +25,18 @@ import {
   X,
 } from "lucide-react";
 import type {
+  CampusPoster,
   CommunityPost,
   ConnectCategory,
   InterestPoll,
   ItemStatus,
+  PosterCategory,
   VolunteerApplication,
   VolunteerFocus,
   VolunteerOpportunity,
 } from "./types";
 import {
+  initialCampusPosters,
   initialCommunityPosts,
   initialInterestPolls,
   initialVolunteerOpportunities,
@@ -52,10 +55,53 @@ export default function ConnectView({
   onNavigateToLocation,
   onSwitchToNavigate,
 }: ConnectViewProps) {
-  const [activeTab, setActiveTab] = useState<"common" | "volunteer">("common");
+  const [activeTab, setActiveTab] = useState<
+    "common" | "volunteer" | "posters"
+  >("common");
   const [commonCategory, setCommonCategory] = useState<ConnectCategory>("All");
   const [volunteerFocus, setVolunteerFocus] = useState<VolunteerFocus>("All");
+  const [posterCategory, setPosterCategory] = useState<PosterCategory>("All");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const POSTERS_STORAGE_KEY = "uniway.connect.posters.v1";
+  const [posters, setPosters] = useState<CampusPoster[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem(POSTERS_STORAGE_KEY);
+        if (stored) return JSON.parse(stored);
+      } catch {}
+    }
+    return initialCampusPosters;
+  });
+
+  const savePosters = (updated: CampusPoster[]) => {
+    setPosters(updated);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(POSTERS_STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+    }
+  };
+
+  const handlePosterVote = (posterId: string, optionId: string) => {
+    const updated = posters.map((poster) => {
+      if (poster.id !== posterId) return poster;
+      if (poster.poll.userVotedOptionId) return poster;
+      const nextOptions = poster.poll.options.map((opt) =>
+        opt.id === optionId ? { ...opt, votes: opt.votes + 1 } : opt,
+      );
+      return {
+        ...poster,
+        poll: {
+          ...poster.poll,
+          userVotedOptionId: optionId,
+          totalVotes: poster.poll.totalVotes + 1,
+          options: nextOptions,
+        },
+      };
+    });
+    savePosters(updated);
+  };
 
   const [posts, setPosts] = useState<CommunityPost[]>(initialCommunityPosts);
   const [opportunities, setOpportunities] = useState<VolunteerOpportunity[]>(
@@ -69,6 +115,105 @@ export default function ConnectView({
   // Creation modals
   const [isCreatingPost, setIsCreatingPost] = useState(false);
   const [isCreatingVol, setIsCreatingVol] = useState(false);
+  const [isCreatingPoster, setIsCreatingPoster] = useState(false);
+
+  // Create poster form fields
+  const [newPosterTitle, setNewPosterTitle] = useState("");
+  const [newPosterAuthor, setNewPosterAuthor] = useState("");
+  const [newPosterCategory, setNewPosterCategory] =
+    useState<CampusPoster["category"]>("Events");
+  const [newPosterPlaceId, setNewPosterPlaceId] = useState("science");
+  const [newPosterLocationCustom, setNewPosterLocationCustom] = useState("");
+  const [newPosterDate, setNewPosterDate] = useState(
+    "Friday, Nov 21 · 15:00 – 18:00",
+  );
+  const [newPosterDescription, setNewPosterDescription] = useState("");
+  const [newPosterImageUrl, setNewPosterImageUrl] = useState("");
+  const [newPosterPollQuestion, setNewPosterPollQuestion] = useState("");
+  const [newPosterPollOptions, setNewPosterPollOptions] = useState<string[]>([
+    "Yes, count me in!",
+    "Maybe, depending on schedule",
+    "Interested in volunteering",
+  ]);
+
+  const handleDeletePoster = (posterId: string) => {
+    const updated = posters.filter((p) => p.id !== posterId);
+    savePosters(updated);
+  };
+
+  const handleCreatePoster = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (
+      !newPosterTitle.trim() ||
+      !newPosterAuthor.trim() ||
+      !newPosterDescription.trim() ||
+      !newPosterPollQuestion.trim()
+    ) {
+      return;
+    }
+    const cleanOptions = newPosterPollOptions
+      .map((opt) => opt.trim())
+      .filter(Boolean);
+    if (cleanOptions.length < 2) return;
+
+    let locRef: LocationReference | undefined = undefined;
+    let locLabel = "";
+    if (newPosterPlaceId === "custom") {
+      locLabel = newPosterLocationCustom.trim() || "Campus Ground";
+    } else {
+      const match = campusLocations.find((l) => l.id === newPosterPlaceId);
+      if (match) {
+        locRef = demoLocation(match.id);
+        locLabel = match.name;
+      } else {
+        locLabel = "Campus Ground";
+      }
+    }
+
+    const newPoster: CampusPoster = {
+      id: `poster-${Date.now()}`,
+      title: newPosterTitle.trim(),
+      author: newPosterAuthor.trim(),
+      category: newPosterCategory,
+      location: locRef,
+      locationName: locLabel,
+      eventDate: newPosterDate.trim() || "Upcoming date",
+      description: newPosterDescription.trim(),
+      imageUrl: newPosterImageUrl.trim() || undefined,
+      bannerGradient:
+        newPosterCategory === "Events"
+          ? "linear-gradient(135deg, #058c42, #0d5c31)"
+          : newPosterCategory === "Clubs"
+            ? "linear-gradient(135deg, #093c30, #14532d)"
+            : newPosterCategory === "Academic"
+              ? "linear-gradient(135deg, #0369a1, #0f766e)"
+              : "linear-gradient(135deg, #15803d, #047857)",
+      createdAt: new Date().toISOString(),
+      poll: {
+        id: `poll-${Date.now()}`,
+        question: newPosterPollQuestion.trim(),
+        totalVotes: 0,
+        options: cleanOptions.map((label, i) => ({
+          id: `opt-${Date.now()}-${i}`,
+          label,
+          votes: 0,
+        })),
+      },
+    };
+
+    savePosters([newPoster, ...posters]);
+    setIsCreatingPoster(false);
+    setNewPosterTitle("");
+    setNewPosterAuthor("");
+    setNewPosterDescription("");
+    setNewPosterImageUrl("");
+    setNewPosterPollQuestion("");
+    setNewPosterPollOptions([
+      "Yes, count me in!",
+      "Maybe, depending on schedule",
+      "Interested in volunteering",
+    ]);
+  };
 
   // Create post form fields
   const [newPostTitle, setNewPostTitle] = useState("");
@@ -269,6 +414,23 @@ export default function ConnectView({
     });
   }, [opportunities, volunteerFocus, searchQuery]);
 
+  // Filter Campus Posters
+  const filteredPosters = useMemo(() => {
+    return posters.filter((poster) => {
+      const matchesCategory =
+        posterCategory === "All" || poster.category === posterCategory;
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        poster.title.toLowerCase().includes(q) ||
+        poster.author.toLowerCase().includes(q) ||
+        poster.description.toLowerCase().includes(q) ||
+        poster.locationName.toLowerCase().includes(q) ||
+        poster.poll.question.toLowerCase().includes(q);
+      return matchesCategory && matchesSearch;
+    });
+  }, [posters, posterCategory, searchQuery]);
+
   const handleApplySubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!applicantName.trim() || !applicantEmail.trim()) return;
@@ -353,6 +515,20 @@ export default function ConnectView({
             {filteredOpportunities.length}
           </span>
         </button>
+
+        <button
+          className={`connect-tab-btn ${activeTab === "posters" ? "active" : ""}`}
+          onClick={() => {
+            setActiveTab("posters");
+            setSearchQuery("");
+          }}
+          type="button"
+          aria-pressed={activeTab === "posters"}
+        >
+          <Sparkles size={18} />
+          <span>Posters & Polls</span>
+          <span className="connect-tab-badge">{filteredPosters.length}</span>
+        </button>
       </nav>
 
       {/* Controls Bar: Search, Category Filters, Post & Management Buttons */}
@@ -366,7 +542,9 @@ export default function ConnectView({
               placeholder={
                 activeTab === "common"
                   ? "Search textbooks, lab kits, snacks, or sellers..."
-                  : "Search sustainability projects, mentoring, or roles..."
+                  : activeTab === "volunteer"
+                    ? "Search sustainability projects, mentoring, or roles..."
+                    : "Search campus posters, clubs, events, or polls..."
               }
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -384,7 +562,7 @@ export default function ConnectView({
             )}
           </div>
 
-          {/* Action Buttons: List an Item / Post Opportunity */}
+          {/* Action Buttons: List an Item / Post Opportunity / Post Poster */}
           {activeTab === "common" ? (
             <button
               type="button"
@@ -394,7 +572,7 @@ export default function ConnectView({
               <Plus size={16} />
               <span>List an Item</span>
             </button>
-          ) : (
+          ) : activeTab === "volunteer" ? (
             <button
               type="button"
               className="btn-create-post"
@@ -403,6 +581,15 @@ export default function ConnectView({
               <Plus size={16} />
               <span>Post Opportunity</span>
             </button>
+          ) : (
+            <button
+              type="button"
+              className="btn-create-post"
+              onClick={() => setIsCreatingPoster(true)}
+            >
+              <Plus size={16} />
+              <span>Post Campus Poster</span>
+            </button>
           )}
 
           {/* Manage Mode Toggle Button */}
@@ -410,7 +597,7 @@ export default function ConnectView({
             type="button"
             className={`btn-manage-toggle ${manageMode ? "active" : ""}`}
             onClick={() => setManageMode(!manageMode)}
-            title="Toggle seller status and opportunity management"
+            title="Toggle seller status, opportunity management, or poster moderation"
           >
             <SlidersHorizontal size={15} />
             <span>
@@ -418,7 +605,9 @@ export default function ConnectView({
                 ? "Exit Management"
                 : activeTab === "common"
                   ? "Seller Controls"
-                  : "Organizer Controls"}
+                  : activeTab === "volunteer"
+                    ? "Organizer Controls"
+                    : "Moderator Controls"}
             </span>
           </button>
         </div>
@@ -450,7 +639,7 @@ export default function ConnectView({
               </button>
             ))}
           </div>
-        ) : (
+        ) : activeTab === "volunteer" ? (
           <div
             className="connect-filter-pills"
             role="toolbar"
@@ -472,6 +661,32 @@ export default function ConnectView({
                 onClick={() => setVolunteerFocus(focus)}
               >
                 {focus}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div
+            className="connect-filter-pills"
+            role="toolbar"
+            aria-label="Poster category filters"
+          >
+            {(
+              [
+                "All",
+                "Events",
+                "Clubs",
+                "Academic",
+                "Sports",
+                "Civic",
+              ] as PosterCategory[]
+            ).map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                className={`connect-pill ${posterCategory === cat ? "active" : ""}`}
+                onClick={() => setPosterCategory(cat)}
+              >
+                {cat}
               </button>
             ))}
           </div>
@@ -898,6 +1113,165 @@ export default function ConnectView({
         </>
       )}
 
+      {/* Active Tab View: Posters & Polls */}
+      {activeTab === "posters" && (
+        <section
+          className="posters-section"
+          aria-label="Campus posters and polls"
+        >
+          <div className="posters-grid">
+            {filteredPosters.map((poster) => (
+              <article key={poster.id} className="poster-card">
+                <div
+                  className="poster-banner"
+                  style={{
+                    background: poster.imageUrl
+                      ? `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.7)), url("${poster.imageUrl}") center/cover no-repeat`
+                      : poster.bannerGradient ||
+                        "linear-gradient(135deg, #058c42, #0d5c31)",
+                  }}
+                >
+                  <div className="poster-banner-top">
+                    <span className="poster-badge">{poster.category}</span>
+                    {poster.eventDate && (
+                      <span className="poster-date">
+                        <Calendar size={13} />
+                        {poster.eventDate}
+                      </span>
+                    )}
+                    {manageMode && (
+                      <button
+                        type="button"
+                        className="thumbnail-remove"
+                        style={{
+                          marginLeft: "auto",
+                          background: "rgba(0,0,0,0.45)",
+                          border: "none",
+                          color: "#fff",
+                          cursor: "pointer",
+                          padding: "4px 6px",
+                          borderRadius: 6,
+                          display: "inline-flex",
+                          alignItems: "center",
+                        }}
+                        onClick={() => handleDeletePoster(poster.id)}
+                        aria-label={`Delete poster ${poster.title}`}
+                        title="Delete poster"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </div>
+                  <h3 className="poster-title">{poster.title}</h3>
+                  <div className="poster-location-bar">
+                    <span className="poster-loc-name">
+                      <MapPin size={14} />
+                      {poster.locationName}
+                    </span>
+                    <button
+                      type="button"
+                      className="poster-navigate-btn"
+                      onClick={() =>
+                        onNavigateToLocation(
+                          poster.location,
+                          poster.locationName,
+                        )
+                      }
+                      title={`Navigate to ${poster.locationName}`}
+                    >
+                      <Navigation size={13} />
+                      <span>Directions</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="poster-body">
+                  <p className="poster-author">Posted by {poster.author}</p>
+                  <p className="poster-description">{poster.description}</p>
+
+                  <div
+                    className="poster-poll-box"
+                    aria-label={`Attached poll: ${poster.poll.question}`}
+                  >
+                    <div className="poster-poll-header">
+                      <span className="poll-tag">
+                        <Vote size={13} /> Attached Poll
+                      </span>
+                      <span className="poll-count-tag">
+                        {poster.poll.totalVotes}{" "}
+                        {poster.poll.totalVotes === 1 ? "vote" : "votes"}
+                      </span>
+                    </div>
+                    <h4 className="poster-poll-question">
+                      {poster.poll.question}
+                    </h4>
+
+                    <div className="poll-options">
+                      {poster.poll.options.map((opt) => {
+                        const pct =
+                          poster.poll.totalVotes > 0
+                            ? Math.round(
+                                (opt.votes / poster.poll.totalVotes) * 100,
+                              )
+                            : 0;
+                        const isVoted =
+                          poster.poll.userVotedOptionId === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            className={`poll-option-row ${isVoted ? "voted" : ""}`}
+                            onClick={() => handlePosterVote(poster.id, opt.id)}
+                            disabled={Boolean(poster.poll.userVotedOptionId)}
+                            aria-pressed={isVoted}
+                          >
+                            <div
+                              className="poll-bar"
+                              style={{ width: `${pct}%` }}
+                            />
+                            <span className="poll-option-text">
+                              {opt.label}
+                              {isVoted && (
+                                <strong className="voted-indicator">
+                                  {" "}
+                                  ✓ (Your vote)
+                                </strong>
+                              )}
+                            </span>
+                            <span className="poll-option-pct">
+                              {pct}% <small>({opt.votes})</small>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          {!filteredPosters.length && (
+            <div className="connect-empty">
+              <Sparkles size={36} />
+              <h3>No campus posters found</h3>
+              <p>
+                Be the first to put up a poster and poll for your club, project,
+                or event!
+              </p>
+              <button
+                type="button"
+                className="btn-create-post"
+                onClick={() => setIsCreatingPoster(true)}
+              >
+                <Plus size={16} />
+                <span>+ Post Campus Poster</span>
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Modal: Create Marketplace Post */}
       {isCreatingPost && (
         <div
@@ -1283,6 +1657,290 @@ export default function ConnectView({
                   style={{ flex: 1, justifyContent: "center" }}
                 >
                   <Check size={16} /> Publish Opportunity
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Create Campus Poster & Poll */}
+      {isCreatingPoster && (
+        <div
+          className="connect-modal-backdrop"
+          onClick={() => setIsCreatingPoster(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="connect-modal-card"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="connect-modal-close"
+              type="button"
+              onClick={() => setIsCreatingPoster(false)}
+              aria-label="Close modal"
+            >
+              <X size={18} />
+            </button>
+
+            <span
+              className="connect-category-badge"
+              style={{ width: "fit-content" }}
+            >
+              Campus Connect · Poster & Poll
+            </span>
+            <h2 style={{ margin: 0, fontSize: 20 }}>
+              Put Up a Campus Poster & Poll
+            </h2>
+            <p
+              style={{
+                fontSize: 13,
+                color: "var(--muted)",
+                margin: "0 0 10px",
+              }}
+            >
+              Promote your student society, hackathon, workshop, or civic drive
+              with an interactive multi-choice poll attached below.
+            </p>
+
+            <form
+              onSubmit={handleCreatePoster}
+              style={{ display: "flex", flexDirection: "column", gap: 12 }}
+            >
+              <div className="form-group">
+                <label htmlFor="poster-title-input">Poster Title *</label>
+                <input
+                  id="poster-title-input"
+                  type="text"
+                  required
+                  className="form-control"
+                  placeholder="e.g. Annual Campus Robotics Expo"
+                  value={newPosterTitle}
+                  onChange={(e) => setNewPosterTitle(e.target.value)}
+                />
+              </div>
+
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label htmlFor="poster-author-input">
+                    Organizer / Club *
+                  </label>
+                  <input
+                    id="poster-author-input"
+                    type="text"
+                    required
+                    className="form-control"
+                    placeholder="e.g. Robotics & AI Club"
+                    value={newPosterAuthor}
+                    onChange={(e) => setNewPosterAuthor(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="poster-category-select">Category *</label>
+                  <select
+                    id="poster-category-select"
+                    className="form-control"
+                    value={newPosterCategory}
+                    onChange={(e) =>
+                      setNewPosterCategory(
+                        e.target.value as CampusPoster["category"],
+                      )
+                    }
+                  >
+                    <option value="Events">Events</option>
+                    <option value="Clubs">Clubs</option>
+                    <option value="Academic">Academic</option>
+                    <option value="Sports">Sports</option>
+                    <option value="Civic">Civic</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label htmlFor="poster-date-input">Event Date & Time</label>
+                  <input
+                    id="poster-date-input"
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. Thursday, Nov 27 · 16:00"
+                    value={newPosterDate}
+                    onChange={(e) => setNewPosterDate(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="poster-place-select">Venue Location</label>
+                  <select
+                    id="poster-place-select"
+                    className="form-control"
+                    value={newPosterPlaceId}
+                    onChange={(e) => setNewPosterPlaceId(e.target.value)}
+                  >
+                    {campusLocations.map((loc) => (
+                      <option key={loc.id} value={loc.id}>
+                        {loc.name}
+                      </option>
+                    ))}
+                    <option value="custom">Other / Custom Location</option>
+                  </select>
+                </div>
+              </div>
+
+              {newPosterPlaceId === "custom" && (
+                <div className="form-group">
+                  <label htmlFor="poster-custom-loc">Custom Location</label>
+                  <input
+                    id="poster-custom-loc"
+                    type="text"
+                    className="form-control"
+                    placeholder="Specify meeting room, field, or hall"
+                    value={newPosterLocationCustom}
+                    onChange={(e) => setNewPosterLocationCustom(e.target.value)}
+                  />
+                </div>
+              )}
+
+              <div className="form-group">
+                <label htmlFor="poster-desc-input">Poster Description *</label>
+                <textarea
+                  id="poster-desc-input"
+                  required
+                  rows={2}
+                  className="form-control"
+                  style={{ height: "auto", padding: "8px 12px" }}
+                  placeholder="Share details, schedule, highlights, and what participants should expect..."
+                  value={newPosterDescription}
+                  onChange={(e) => setNewPosterDescription(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="poster-image-input">
+                  Poster Image or Flyer URL (Optional)
+                </label>
+                <input
+                  id="poster-image-input"
+                  type="text"
+                  className="form-control"
+                  placeholder="https://... or image link (optional)"
+                  value={newPosterImageUrl}
+                  onChange={(e) => setNewPosterImageUrl(e.target.value)}
+                />
+              </div>
+
+              <div
+                style={{
+                  borderTop: "1px solid rgba(5, 140, 66, 0.2)",
+                  paddingTop: 10,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: "#058c42",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <Vote size={15} /> Attached Interactive Poll
+                </span>
+
+                <div className="form-group">
+                  <label htmlFor="poster-poll-q">Poll Question *</label>
+                  <input
+                    id="poster-poll-q"
+                    type="text"
+                    required
+                    className="form-control"
+                    placeholder="e.g. Which project track are you most excited for?"
+                    value={newPosterPollQuestion}
+                    onChange={(e) => setNewPosterPollQuestion(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Poll Options (2 to 5 options) *</label>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 6,
+                    }}
+                  >
+                    {newPosterPollOptions.map((opt, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          display: "flex",
+                          gap: 6,
+                          alignItems: "center",
+                        }}
+                      >
+                        <input
+                          type="text"
+                          required
+                          className="form-control"
+                          placeholder={`Option ${idx + 1}`}
+                          value={opt}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setNewPosterPollOptions((prev) =>
+                              prev.map((item, i) => (i === idx ? val : item)),
+                            );
+                          }}
+                        />
+                        {newPosterPollOptions.length > 2 && (
+                          <button
+                            type="button"
+                            className="thumbnail-remove"
+                            onClick={() =>
+                              setNewPosterPollOptions((prev) =>
+                                prev.filter((_, i) => i !== idx),
+                              )
+                            }
+                            aria-label={`Remove option ${idx + 1}`}
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {newPosterPollOptions.length < 5 && (
+                    <button
+                      type="button"
+                      className="text-button"
+                      style={{ marginTop: 4, width: "fit-content" }}
+                      onClick={() =>
+                        setNewPosterPollOptions((prev) => [
+                          ...prev,
+                          `Option ${prev.length + 1}`,
+                        ])
+                      }
+                    >
+                      + Add another option
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+                <button
+                  type="submit"
+                  className="btn-create-post"
+                  style={{ flex: 1, justifyContent: "center" }}
+                >
+                  <Check size={16} /> Publish Poster & Poll
                 </button>
               </div>
             </form>

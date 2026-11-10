@@ -306,4 +306,122 @@ describe("UniWay Connect (Module B) - Seller & Volunteer Management", () => {
     // Campus map is back
     expect(screen.getByRole("region", { name: "Campus map" })).toBeTruthy();
   });
+
+  it("renders campus posters with attached polls, allows live voting, and displays updated percentage", () => {
+    render(
+      <ConnectView
+        onNavigateToLocation={vi.fn()}
+        onSwitchToNavigate={vi.fn()}
+      />,
+    );
+
+    // Switch to Posters & Polls tab
+    const postersTabBtn = screen.getByRole("button", {
+      name: /Posters & Polls/i,
+    });
+    fireEvent.click(postersTabBtn);
+
+    // Check poster cards are rendered
+    expect(
+      screen.getByText("Annual Campus Innovation Hackathon 2026"),
+    ).toBeTruthy();
+
+    // Check attached poll questions
+    const pollQuestion = screen.getByText(
+      /Which track will your team hack on\?/i,
+    );
+    expect(pollQuestion).toBeTruthy();
+
+    // Vote on an attached poll option
+    const smartNavBtn = screen.getByRole("button", {
+      name: /Smart Navigation & Indoor Mobility/i,
+    });
+    fireEvent.click(smartNavBtn);
+
+    // Verify option now shows (Your vote)
+    expect(screen.getAllByText(/✓ \(Your vote\)/i).length).toBeGreaterThan(0);
+  });
+
+  it("allows creating a new poster with an attached poll and saves it locally", () => {
+    render(
+      <ConnectView
+        onNavigateToLocation={vi.fn()}
+        onSwitchToNavigate={vi.fn()}
+      />,
+    );
+
+    // Switch to Posters & Polls tab
+    fireEvent.click(screen.getByRole("button", { name: /Posters & Polls/i }));
+
+    // Click "+ Post Campus Poster"
+    const openCreateBtn = screen.getByRole("button", {
+      name: /Post Campus Poster/i,
+    });
+    fireEvent.click(openCreateBtn);
+
+    // Fill form
+    fireEvent.change(screen.getByLabelText(/Poster Title \*/i), {
+      target: { value: "Robotics Club Showcase 2026" },
+    });
+    fireEvent.change(screen.getByLabelText(/Organizer \/ Club \*/i), {
+      target: { value: "Robotics Society" },
+    });
+    fireEvent.change(screen.getByLabelText(/Event Date & Time/i), {
+      target: { value: "Friday, Dec 5 · 14:00" },
+    });
+    fireEvent.change(screen.getByLabelText(/Poster Description \*/i), {
+      target: {
+        value: "Hands-on exhibition with autonomous rovers and drones.",
+      },
+    });
+    fireEvent.change(screen.getByLabelText(/Poll Question \*/i), {
+      target: { value: "What demo do you want to see?" },
+    });
+
+    const optInputs = screen.getAllByPlaceholderText(/Option \d/i);
+    fireEvent.change(optInputs[0], { target: { value: "Autonomous Rovers" } });
+    fireEvent.change(optInputs[1], { target: { value: "Racing Drones" } });
+
+    // Submit form
+    const submitBtn = screen.getByRole("button", {
+      name: /Publish Poster & Poll/i,
+    });
+    fireEvent.click(submitBtn);
+
+    // New poster should now appear in the feed
+    expect(screen.getByText("Robotics Club Showcase 2026")).toBeTruthy();
+    expect(screen.getByText(/Posted by Robotics Society/i)).toBeTruthy();
+    expect(screen.getByText("What demo do you want to see?")).toBeTruthy();
+    expect(screen.getByText("Autonomous Rovers")).toBeTruthy();
+    expect(screen.getByText("Racing Drones")).toBeTruthy();
+  });
+
+  it("allows moderator controls to delete a poster", () => {
+    render(
+      <ConnectView
+        onNavigateToLocation={vi.fn()}
+        onSwitchToNavigate={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Posters & Polls/i }));
+    expect(
+      screen.getByText("Annual Campus Innovation Hackathon 2026"),
+    ).toBeTruthy();
+
+    // Toggle Moderator Controls
+    fireEvent.click(
+      screen.getByRole("button", { name: /Moderator Controls/i }),
+    );
+
+    // Click delete poster
+    const deleteBtn = screen.getByRole("button", {
+      name: /Delete poster Annual Campus Innovation Hackathon 2026/i,
+    });
+    fireEvent.click(deleteBtn);
+
+    expect(
+      screen.queryByText("Annual Campus Innovation Hackathon 2026"),
+    ).toBeNull();
+  });
 });

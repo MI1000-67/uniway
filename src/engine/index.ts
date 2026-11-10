@@ -143,9 +143,9 @@ export async function analyzeUploadedMap(
     workSignal.throwIfAborted();
     update("Preparing your image", 0.02);
     const source = await abortable(loadImage(image.url), workSignal);
-    if (source.naturalWidth * source.naturalHeight > 40_000_000)
+    if (source.naturalWidth * source.naturalHeight > 100_000_000)
       throw new Error(
-        "This image has a lot of detail. Resize it below 40 megapixels, then try again.",
+        "This image has a lot of detail. Resize it below 100 megapixels, then try again.",
       );
     // Bound memory and CPU independently of the resolution of the upload.
     const imageScale = Math.min(
@@ -401,7 +401,10 @@ export async function analyzeUploadedMap(
           ? layout.edges
           : geometry.path.edges,
     };
-    if (layout.layoutKind === "floorplan") {
+    if (
+      layout.layoutKind === "floorplan" &&
+      (!layout.edges || layout.edges.length === 0)
+    ) {
       const indoor = extractIndoorLinework(pathImage, pathRegions);
       path = {
         nodes: indoor.nodes.map((n) => ({
