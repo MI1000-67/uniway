@@ -225,7 +225,7 @@ function CampusMap({
       <svg
         ref={svgRef}
         className="campus-svg"
-        viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
+        viewBox={`${view.x} ${view.y} ${Math.max(1, view.w)} ${Math.max(1, view.h)}`}
         role="group"
         tabIndex={0}
         onKeyDown={(event) => {

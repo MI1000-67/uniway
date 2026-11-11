@@ -31,15 +31,18 @@ export function fitMapView(
     height = Math.max(1, size.height);
   const usableWidth = Math.max(80, width - inset.left - inset.right);
   const usableHeight = Math.max(80, height - inset.top - inset.bottom);
-  const scale = Math.min(
-    usableWidth / Math.max(1, bounds.w),
-    usableHeight / Math.max(1, bounds.h),
+  const scale = Math.max(
+    0.0001,
+    Math.min(
+      usableWidth / Math.max(1, bounds.w),
+      usableHeight / Math.max(1, bounds.h),
+    ),
   );
   return {
     x: bounds.x + bounds.w / 2 - (inset.left + usableWidth / 2) / scale,
     y: bounds.y + bounds.h / 2 - (inset.top + usableHeight / 2) / scale,
-    w: width / scale,
-    h: height / scale,
+    w: Math.max(1, width / scale),
+    h: Math.max(1, height / scale),
   };
 }
 

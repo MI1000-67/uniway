@@ -956,7 +956,49 @@ export function extractIndoorLinework(
     }
   }
 
-  // Fallback: if no chamber was singled out as a corridor, use all internal open chambers
+  // Fallback: if no chamber was singled out as a corridor, check if candidateRegions define room interiors
+  if (corridorPixelCount < 40 && candidateRegions.length > 0) {
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
+    for (const r of candidateRegions) {
+      if (r.x < minX) minX = r.x;
+      if (r.y < minY) minY = r.y;
+      if (r.x + r.width > maxX) maxX = r.x + r.width;
+      if (r.y + r.height > maxY) maxY = r.y + r.height;
+    }
+    const pad = Math.max(16, Math.round(Math.min(w, h) * 0.04));
+    minX = Math.max(0, minX - pad);
+    minY = Math.max(0, minY - pad);
+    maxX = Math.min(w - 1, maxX + pad);
+    maxY = Math.min(h - 1, maxY + pad);
+
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        const idx = y * w + x;
+        if (wallMask[idx] === 1) continue;
+        let inRoom = false;
+        for (const r of candidateRegions) {
+          if (
+            x >= r.x + 6 &&
+            x <= r.x + r.width - 6 &&
+            y >= r.y + 6 &&
+            y <= r.y + r.height - 6
+          ) {
+            inRoom = true;
+            break;
+          }
+        }
+        if (!inRoom) {
+          corridorMask[idx] = 1;
+          corridorPixelCount++;
+        }
+      }
+    }
+  }
+
+  // Second fallback: if still empty, use all internal open chambers
   if (corridorPixelCount < 40) {
     for (const c of chambers) {
       for (const p of c.pixels) {
@@ -990,7 +1032,8 @@ export function extractIndoorLinework(
           Math.hypot(a.x - b.x, a.y - b.y) < Math.max(w, h) * 0.45 &&
           hasLineOfSight(a.x, a.y, b.x, b.y, wallMask, w, h)
         ) {
-          edges.push({ from: a.id, to: b.id, stepFree: false });
+          const isStairs = /stair|steps/i.test(a.landmark || b.landmark || "");
+          edges.push({ from: a.id, to: b.id, stepFree: !isStairs });
         }
       }
     }
@@ -1020,12 +1063,13 @@ export function extractIndoorLinework(
         y: ry,
         landmark: "room approach to review",
       });
-      edges.push({ from: roomId, to: bestNode.id, stepFree: false });
+      const isStairs = /stair|steps/i.test(bestNode.landmark || "");
+      edges.push({ from: roomId, to: bestNode.id, stepFree: !isStairs });
     }
   }
 
   const coverage = corridorPixelCount / Math.max(1, w * h);
-  const simplified = simplifyLinework(nodes, edges);
+  const simplified = simplifyLinework(nodes, edges, 2.5);
   const lookup = new Map(simplified.nodes.map((n) => [n.id, n]));
   // Simplifying bends must not introduce a chord through a wall.
   simplified.edges = simplified.edges.filter((e) => {
@@ -1036,8 +1080,12 @@ export function extractIndoorLinework(
   return { ...simplified, mask: corridorMask, coverage };
 }
 
-/** Reduce sampled lines to their junctions and bends, within 0.7 source pixels. */
-export function simplifyLinework(nodes: PathNode[], edges: PathEdge[]) {
+/** Reduce sampled lines to their junctions and bends, within the given pixel tolerance. */
+export function simplifyLinework(
+  nodes: PathNode[],
+  edges: PathEdge[],
+  tolerance = 0.7,
+) {
   const lookup = new Map(nodes.map((n) => [n.id, n]));
   const adjacency = new Map(nodes.map((n) => [n.id, [] as string[]]));
   for (const e of edges) {
@@ -1090,7 +1138,7 @@ export function simplifyLinework(nodes: PathNode[], edges: PathEdge[]) {
         index = i;
       }
     }
-    return farthest > 0.7
+    return farthest > tolerance
       ? [
           ...reduce(ids.slice(0, index + 1)).slice(0, -1),
           ...reduce(ids.slice(index)),

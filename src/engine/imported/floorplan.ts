@@ -110,7 +110,7 @@ export function analyzeFloorPlan(
   for (const l of lines) {
     const alphanum = l.text.match(/[\p{L}\p{N}]/gu)?.length ?? 0;
     if (
-      l.confidence < 40 ||
+      l.confidence < 20 ||
       alphanum < 2 ||
       l.text.length > 80 ||
       FLOOR_TITLE.test(l.text) ||
@@ -129,7 +129,7 @@ export function analyzeFloorPlan(
     );
     const isRoomLabel = ROOM_TEXT.test(l.text) || ROOM_CODE.test(l.text.trim());
     // Retain detected room labels and candidate room names.
-    if (!region && !isRoomLabel && l.confidence < 60) continue;
+    if (!region && !isRoomLabel && l.confidence < 40) continue;
     if (
       labels.some(
         (p) => p.text === l.text && Math.hypot(p.x - l.cx, p.y - l.cy) < 12,

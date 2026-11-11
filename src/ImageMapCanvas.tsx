@@ -175,7 +175,7 @@ export default function ImageMapCanvas({
     >
       <svg
         ref={svg}
-        viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
+        viewBox={`${view.x} ${view.y} ${Math.max(1, view.w)} ${Math.max(1, view.h)}`}
         tabIndex={0}
         role="group"
         aria-label={
