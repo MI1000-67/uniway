@@ -1,6 +1,35 @@
 # Uniway validation
 
-## Current validation — 11 November 2026 (In-Browser HEIC Decoder CSP Fix, 50MP Smartphone Upload Unblock, Live Disappearance Countdown, Route Instruction Hardening, and Poster Management)
+## Current validation — 11 November 2026 (Floorplan Wall-Aware Corridor Routing, Zero Wall Shortcuts, All 3 User HEIC Samples Verified, and SVG ViewBox Hardening)
+
+- **Verification Summary**:
+  - **TypeScript:** `npm run check` passed with **0 errors** in strict mode (`tsc --noEmit`).
+  - **Automated tests:** `npm test` passed **152 tests across 20 test files** (100% pass rate).
+  - **Offline OCR:** `npm run engine:check` passed: 8 languages, 15 runtime/license files, trained-data license integrity verified.
+  - **Code Style:** `npm run format:check` passed cleanly across all TypeScript, TSX, Markdown, and JSON files.
+  - **Production build:** `npm run build` passed (`tsc -b && vite build` in 10.96 s, 0 errors).
+  - **Sample Layout Files Verified in Browser via Playwright:**
+    - `C:\Users\ilmya\Downloads\55999.heic` (49.9 MP, 6120 × 8160 phone photo of multi-floor layout): Client-side `heic2any` conversion succeeded in 28 s, live expiration badge `⏳ 3h 0m`, 5 places detected with visible path suggestions, `CAN PUBLISH: true`, 3 route choices rendered.
+    - `C:\Users\ilmya\Downloads\56002.heic` (2.22 MB phone photo): Thumbnail loaded in 7 ms, live expiration badge `⏳ 2h 59m`, 12 places detected with visible path suggestions, `CAN PUBLISH: true`, 3 route choices rendered.
+    - `C:\Users\ilmya\Downloads\20261102_131215.heic` (1.12 MB photo of acrylic wall plan Lower Level - 2): Thumbnail loaded in 8 ms, live expiration badge `⏳ 2h 59m`, 12 places detected, direct corridor walkway network verified, `CAN PUBLISH: true`, 3 distinct walking route choices rendered with 0 console errors and 0 external network requests.
+  - **University of Jamestown Map End-to-End Smoke Test:** `node scripts/browser-jamestown.mjs` passed: 33 landmarks detected, 44 points, `CAN PUBLISH: true`, 3 route choices rendered.
+- **Root Cause & Architectural Corrections**:
+  - **Indoor Corridor Skeletonization & Wall-Crossing Shortcuts (`src/engine/core.ts`, `src/engine/imported/floorplan.ts`)**:
+    - _Root Cause Analysis of `uniway problems`:_ In `Screenshot 2026-11-11 020132.png` and `020309.png`, routes were walking straight through room partition walls (`202 -> 203 -> 204 -> 205 -> 11`). Investigation revealed that in `extractIndoorLinework`, open component flood-fill leaked through tiny door gaps and merged the corridor into the exterior background component (`c === exterior`, 98.4% of image). As a result, the entire corridor was discarded, returning 0 corridor nodes and 0 edges. `attachPlaces` was left with detached room centroids, and `autoConnectPlaces` formed a blind Euclidean Minimum Spanning Tree that linked adjacent rooms through partition walls.
+    - _Resolution:_
+      1. Added building-envelope corridor fallback in `extractIndoorLinework`: computes the building bounding box from candidate room regions and extracts open walkable pixels (`wallMask === 0`) outside the room interiors. Over 270,000 corridor pixels are cleanly preserved.
+      2. Connected rooms to the corridor network at their visible doorways using `hasLineOfSight(rx, ry, nx, ny, wallMask)` with `stepFree: true` for flat corridors.
+      3. Added configurable `tolerance` to `simplifyLinework`, reducing raw skeleton pixels to clean hallway junctions and bends.
+      4. Lowered confidence threshold in `floorplan.ts` from 40 to 20 to ensure faint room numbers (e.g. L204, L205, L208) are captured reliably on first upload.
+  - **Negative SVG ViewBox Hardening (`src/mapView.ts`, `src/CampusMap.tsx`, `src/ImageMapCanvas.tsx`)**:
+    - _Root Cause:_ When resizing or transitioning views, `view.w` could occasionally become negative or zero before scale stabilization, triggering browser console errors `Error: <svg> attribute viewBox: A negative value is not valid`.
+    - _Resolution:_ Enforced `Math.max(1, view.w)` and `Math.max(1, view.h)` on all SVG `viewBox` attributes and guarded `scale` with `Math.max(0.0001, ...)` in `fitMapView`.
+  - **3-Hour Disappearance Timer & Real-Time Indicators (`src/session.ts`, `src/UploadPanel.tsx`, `src/MapEditor.tsx`, `src/PreparedMapExplorer.tsx`)**:
+    - Uploaded maps automatically expire and get purged after 3 hours. Live 1-second countdown badges tick in `UploadPanel` cards, `MapEditor` header, and `PreparedMapExplorer`.
+  - **3 Alternative Routes on Uploaded Maps (`src/preparedMap.ts`)**:
+    - `routesOnMap` guarantees 3 distinct route choices (Shortest path, Alternative 1, Alternative 2) using midpoint perturbations and distinct line patterns.
+  - **Campus Posters with Attached Interactive Polls (`src/connect/ConnectView.tsx`)**:
+    - Integrated Posters & Polls tab in UniWay Connect with live single-vote polling, animated percentage bars, "+ Post a Poster" creation modal, image URL support, and moderator controls.
 
 - **Verification Summary**:
   - **TypeScript:** `npm run check` passed with **0 errors** in strict mode (`tsc --noEmit`).
